@@ -426,7 +426,6 @@ function getAgeInYears(dobString) {
   return age;
 }
 
-// Live Google Sheet Syncing API
 async function syncDataToGoogleSheet(action, payload) {
   try {
     const res = await fetch(GOOGLE_APPS_SCRIPT_API_URL, {
@@ -501,6 +500,7 @@ async function checkAdminPassword() {
     input.value = '';
     document.getElementById('adminGateOverlay').classList.add('hidden');
     applyRoleGates();
+    await fetchGoogleSheetDatabase();
   } else {
     err.textContent = 'Incorrect passcode. Try again.';
   }
@@ -547,52 +547,62 @@ function switchTab(tab) {
   document.getElementById('dashPane').classList.toggle('hidden', tab!=='dashboard');
 
   if (tab === 'dashboard' && isSuperAdmin) {
-    renderDashboard();
+    fetchGoogleSheetDatabase().then(() => renderDashboard());
   }
 }
 
 function renderDashboard() {
-  const pendingParents = DB.parents.filter(p => p.status === 'Pending Approval' || p.parentId === 'PENDING APPROVAL');
-  const pendingStudents = DB.students.filter(s => s.status === 'Pending Approval' || s.studentId === 'PENDING APPROVAL');
+  // Enhanced filtering to capture any pending/unapproved status
+  const pendingParents = DB.parents.filter(p => {
+    const st = (p.status || '').toString().toLowerCase();
+    const pid = (p.parentId || '').toString().toLowerCase();
+    return st.includes('pending') || st.includes('unapproved') || st.includes('under') || pid.includes('pending');
+  });
+
+  const pendingStudents = DB.students.filter(s => {
+    const st = (s.status || '').toString().toLowerCase();
+    const sid = (s.studentId || '').toString().toLowerCase();
+    return st.includes('pending') || st.includes('unapproved') || st.includes('under') || sid.includes('pending');
+  });
   
-  const approvedParents = DB.parents.filter(p => p.status === 'Approved' && p.parentId !== 'PENDING APPROVAL').length;
-  const approvedStudents = DB.students.filter(s => s.status === 'Approved' && s.studentId !== 'PENDING APPROVAL').length;
+  const approvedParents = DB.parents.filter(p => (p.status || '').toString().toLowerCase() === 'approved' && p.parentId !== 'PENDING APPROVAL').length;
+  const approvedStudents = DB.students.filter(s => (s.status || '').toString().toLowerCase() === 'approved' && s.studentId !== 'PENDING APPROVAL').length;
 
   const totalSeats = Object.values(DB.gradeCapacity).reduce((a,g)=>a+g.max,0);
   const filledSeats = Object.values(DB.gradeCapacity).reduce((a,g)=>a+g.current,0);
 
   const pendingParentRows = pendingParents.map(p => `
     <tr class="border-b border-slate-800">
-      <td class="p-3 mono text-teal-400 font-semibold">${p.requestId || 'PAR-REQ'}</td>
-      <td class="p-3 text-white font-bold">${p.fullName}</td>
-      <td class="p-3 text-slate-300">${p.email}<br><span class="text-slate-500">${p.phone}</span></td>
+      <td class="p-3 mono text-teal-400 font-semibold">${p.requestId || p.parentId || 'PAR-REQ'}</td>
+      <td class="p-3 text-white font-bold">${p.fullName || '—'}</td>
+      <td class="p-3 text-slate-300">${p.email || '—'}<br><span class="text-slate-500">${p.phone || '—'}</span></td>
       <td class="p-3">
         <div class="flex gap-2">
-          ${p.doc1Url ? `<a href="${p.doc1Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs">ID 1</a>` : ''}
-          ${p.doc2Url ? `<a href="${p.doc2Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs">ID 2</a>` : ''}
-          ${p.doc3Url ? `<a href="${p.doc3Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs">ID 3</a>` : ''}
+          ${p.doc1Url ? `<a href="${p.doc1Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-pdf mr-1"></i> ID 1</a>` : ''}
+          ${p.doc2Url ? `<a href="${p.doc2Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-pdf mr-1"></i> ID 2</a>` : ''}
+          ${p.doc3Url ? `<a href="${p.doc3Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-pdf mr-1"></i> ID 3</a>` : ''}
         </div>
       </td>
       <td class="p-3 text-right">
-        <button class="btn btn-teal text-xs py-1 px-3" onclick="approveRecordInAdmin('${p.requestId}', 'parent')">✓ Approve & Issue Credentials</button>
-        <button class="btn btn-ghost text-xs py-1 px-2 text-red-400" onclick="rejectRecordInAdmin('${p.requestId}', 'parent')">✕ Reject</button>
+        <button class="btn btn-teal text-xs py-1 px-3" onclick="approveRecordInAdmin('${p.requestId || p.parentId}', 'parent')">✓ Approve & Issue Credentials</button>
+        <button class="btn btn-ghost text-xs py-1 px-2 text-red-400 ml-1" onclick="rejectRecordInAdmin('${p.requestId || p.parentId}', 'parent')">✕ Reject</button>
       </td>
-    </tr>`).join('') || `<tr><td colspan="5" class="p-4 text-center text-slate-500">No pending parent registrations.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="5" class="p-4 text-center text-slate-500"><i class="fas fa-circle-check text-emerald-400 mr-2"></i>No pending parent registrations queue.</td></tr>`;
 
   const pendingStudentRows = pendingStudents.map(s => `
     <tr class="border-b border-slate-800">
-      <td class="p-3 mono text-teal-400 font-semibold">${s.requestId || 'SL-REQ'}</td>
-      <td class="p-3 text-white font-bold">${s.fullName}</td>
-      <td class="p-3 text-slate-300">${s.gradeApplying}</td>
-      <td class="p-3 text-slate-400 font-mono">${s.parentId}</td>
+      <td class="p-3 mono text-teal-400 font-semibold">${s.requestId || s.studentId || 'SL-REQ'}</td>
+      <td class="p-3 text-white font-bold">${s.fullName || '—'}</td>
+      <td class="p-3 text-slate-300">${s.gradeApplying || '—'}</td>
+      <td class="p-3 text-slate-400 font-mono">${s.parentId || '—'}</td>
       <td class="p-3">
-        ${s.birthCertUrl ? `<a href="${s.birthCertUrl}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs">Birth Cert</a>` : '—'}
+        ${s.birthCertUrl ? `<a href="${s.birthCertUrl}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-image mr-1"></i> Birth Cert</a>` : '—'}
       </td>
       <td class="p-3 text-right">
-        <button class="btn btn-teal text-xs py-1 px-3" onclick="approveRecordInAdmin('${s.requestId}', 'student')">✓ Approve & Issue Credentials</button>
-        <button class="btn btn-ghost text-xs py-1 px-2 text-red-400" onclick="rejectRecordInAdmin('${s.requestId}', 'student')">✕ Reject</button>
+        <button class="btn btn-teal text-xs py-1 px-3" onclick="approveRecordInAdmin('${s.requestId || s.studentId}', 'student')">✓ Approve & Issue Credentials</button>
+        <button class="btn btn-ghost text-xs py-1 px-2 text-red-400 ml-1" onclick="rejectRecordInAdmin('${s.requestId || s.studentId}', 'student')">✕ Reject</button>
       </td>
-    </tr>`).join('') || `<tr><td colspan="6" class="p-4 text-center text-slate-500">No pending student enrollments.</td></tr>`;
+    </tr>`).join('') || `<tr><td colspan="6" class="p-4 text-center text-slate-500"><i class="fas fa-circle-check text-emerald-400 mr-2"></i>No pending student enrollments queue.</td></tr>`;
 
   document.getElementById('dashContent').innerHTML = `
     <div class="dash-head">
@@ -600,12 +610,17 @@ function renderDashboard() {
         <h2>Master Control & Pending Approvals Queue</h2>
         <div class="who">Role: <b style="color:var(--teal)">Super Admin</b></div>
       </div>
-      <button class="btn btn-ghost text-xs py-1.5 px-3 border-indigo-500/40 text-indigo-300" onclick="openAdminPassModal()">
-        🔑 Change Admin Passcode
-      </button>
+      <div class="flex gap-2">
+        <button class="btn btn-ghost text-xs py-1.5 px-3 border-teal-500/40 text-teal-300" onclick="fetchGoogleSheetDatabase()">
+          <i class="fas fa-sync-alt mr-1"></i> Refresh Queue
+        </button>
+        <button class="btn btn-ghost text-xs py-1.5 px-3 border-indigo-500/40 text-indigo-300" onclick="openAdminPassModal()">
+          🔑 Change Admin Passcode
+        </button>
+      </div>
     </div>
     <div class="dash-grid">
-      <div class="dcard"><span>Pending Approvals</span><b class="text-amber-400">${pendingParents.length + pendingStudents.length}</b></div>
+      <div class="dcard"><span>Pending Queue</span><b class="text-amber-400">${pendingParents.length + pendingStudents.length}</b></div>
       <div class="dcard"><span>Approved Parents</span><b>${approvedParents}</b></div>
       <div class="dcard"><span>Approved Students</span><b>${approvedStudents}</b></div>
       <div class="dcard"><span>Filled Seats</span><b>${filledSeats}/${totalSeats}</b></div>
@@ -614,8 +629,7 @@ function renderDashboard() {
     <div class="px-7 py-4 space-y-6">
       <div class="panel">
         <div class="flex justify-between items-center mb-3">
-          <h4 class="text-amber-400"><i class="fas fa-clock mr-2"></i>Pending Parent Registrations Queue</h4>
-          <button class="btn btn-ghost text-xs" onclick="fetchGoogleSheetDatabase()"><i class="fas fa-rotate mr-1"></i> Refresh Queue</button>
+          <h4 class="text-amber-400"><i class="fas fa-clock mr-2"></i>Pending Parent Registrations Queue (${pendingParents.length})</h4>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse">
@@ -635,7 +649,7 @@ function renderDashboard() {
 
       <div class="panel">
         <div class="flex justify-between items-center mb-3">
-          <h4 class="text-amber-400"><i class="fas fa-graduation-cap mr-2"></i>Pending Student Enrollments Queue</h4>
+          <h4 class="text-amber-400"><i class="fas fa-graduation-cap mr-2"></i>Pending Student Enrollments Queue (${pendingStudents.length})</h4>
         </div>
         <div class="overflow-x-auto">
           <table class="w-full text-left text-xs border-collapse">
@@ -657,6 +671,8 @@ function renderDashboard() {
 }
 
 async function approveRecordInAdmin(reqId, type) {
+  if (!confirm(`Are you sure you want to APPROVE and issue official credentials for ${reqId}?`)) return;
+
   const res = await syncDataToGoogleSheet('approveRecord', {
     adminToken: adminSessionToken,
     requestId: reqId,
@@ -664,10 +680,10 @@ async function approveRecordInAdmin(reqId, type) {
   });
 
   if (res && res.status === 'success') {
-    alert(`Record ${reqId} Approved!\nOfficial ID: ${res.officialId}\nInitial Password: ${res.initialPassword}\nAn official email has been sent to the applicant.`);
+    alert(`🎉 Record ${reqId} Approved!\n\nOfficial ID: ${res.officialId}\nInitial Password: ${res.initialPassword}\n\nAn official approval email with credentials has been sent to the applicant.`);
     await fetchGoogleSheetDatabase();
   } else {
-    alert('Failed to approve record. Session may be expired.');
+    alert('Failed to approve record. Session may be expired or Request ID not found.');
   }
 }
 
