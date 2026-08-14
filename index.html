@@ -552,7 +552,6 @@ function switchTab(tab) {
 }
 
 function renderDashboard() {
-  // Enhanced filtering to capture any pending/unapproved status
   const pendingParents = DB.parents.filter(p => {
     const st = (p.status || '').toString().toLowerCase();
     const pid = (p.parentId || '').toString().toLowerCase();
