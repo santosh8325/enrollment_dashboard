@@ -376,9 +376,7 @@ let adminSessionToken = null;
 // Central Live State Store
 const DB = {
   students: [],
-  parents: [
-    {requestId:"PAR-REQ-1001", parentId:"PAR-2026-1001", fullName:"Suresh Mehta", email:"suresh.mehta@gmail.com", phone:"9845011223", status:"Approved", password:"Schola#20261001"}
-  ],
+  parents: [],
   gradeCapacity: {
     "Grade 1":{max:40,current:31}, "Grade 2":{max:40,current:37},
     "Grade 3":{max:40,current:22}, "Grade 4":{max:35,current:34},
@@ -670,19 +668,34 @@ function renderDashboard() {
 }
 
 async function approveRecordInAdmin(reqId, email, type) {
-  if (!confirm(`Are you sure you want to APPROVE and issue official credentials?`)) return;
+  let targetEmail = (email || '').trim();
+  
+  // Prompt admin to correct invalid/incomplete emails (e.g. missing @gmail.com)
+  if (!targetEmail || targetEmail.indexOf('@') === -1) {
+    const prompted = prompt(
+      `The applicant's email address "${targetEmail}" is incomplete or invalid.\n\nPlease enter the full valid email address to send credentials:`,
+      "sivasantosh.kamal@gmail.com"
+    );
+    if (!prompted || prompted.trim().indexOf('@') === -1) {
+      alert("Approval cancelled: A valid email address containing '@' is required to send credentials.");
+      return;
+    }
+    targetEmail = prompted.trim();
+  } else {
+    if (!confirm(`Are you sure you want to APPROVE application ${reqId} and issue official credentials to ${targetEmail}?`)) return;
+  }
 
   const res = await syncDataToGoogleSheet('approveRecord', {
     adminToken: adminSessionToken,
     requestId: reqId,
-    email: email,
+    email: targetEmail,
     type: type
   });
 
   if (res && res.status === 'success') {
     let emailNotice = res.emailSent 
       ? `An official approval email with credentials has been sent to ${res.recipientEmail}.`
-      : `⚠️ Note: Record approved, but email delivery failed to "${res.recipientEmail}". Please verify email format.`;
+      : `⚠️ Note: Record approved, but email dispatch was skipped (${res.emailReason || 'Check email format'}).`;
 
     alert(`🎉 Record Approved!\n\nOfficial ID: ${res.officialId}\nInitial Password: ${res.initialPassword}\n\n${emailNotice}`);
     await fetchGoogleSheetDatabase();
