@@ -680,7 +680,11 @@ async function approveRecordInAdmin(reqId, email, type) {
   });
 
   if (res && res.status === 'success') {
-    alert(`🎉 Record Approved!\n\nOfficial ID: ${res.officialId}\nInitial Password: ${res.initialPassword}\n\nAn official approval email with credentials has been sent to the applicant.`);
+    let emailNotice = res.emailSent 
+      ? `An official approval email with credentials has been sent to ${res.recipientEmail}.`
+      : `⚠️ Note: Record approved, but email delivery failed to "${res.recipientEmail}". Please verify email format.`;
+
+    alert(`🎉 Record Approved!\n\nOfficial ID: ${res.officialId}\nInitial Password: ${res.initialPassword}\n\n${emailNotice}`);
     await fetchGoogleSheetDatabase();
   } else {
     alert('Failed to approve record: ' + (res ? res.message : 'Unknown error'));
@@ -919,7 +923,7 @@ function renderParentWizardStep(body) {
   else if (currentStep === 1) {
     body.innerHTML = `<h2>Contact & Residential Details</h2><div class="sub">Official contact details for parent portal communication.</div>
     <div class="grid2">
-      ${fieldHTML('guardianEmail','Parent Email Address','email',{ph:'name@example.com', errNote:'Must be a valid email address'})}
+      ${fieldHTML('guardianEmail','Parent Email Address','email',{ph:'name@domain.com', errNote:'Must be a valid email address (e.g. user@gmail.com)'})}
       ${fieldHTML('guardianPhone','Mobile Phone Number','text',{ph:'10 to 15 digits', errNote:'Numbers only (10 to 15 digits)'})}
       ${fieldHTML('street','Street Address','text')}
       ${fieldHTML('city','City / Location','text')}
@@ -1233,7 +1237,7 @@ async function submitParentRegistration() {
       </div>
     </div>
     <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 mt-3 text-center">
-      📩 Application submitted! An approval notification with your uploaded documents has been sent to the Admin. Upon approval, your Official Parent ID and Password will be emailed to you.
+      📩 Application submitted! An approval notification with your uploaded documents has been sent to the Admin. Upon approval, your Official Parent ID and Password will be emailed to <b>${form.guardianEmail}</b>.
     </div>`;
 
   btn.textContent = 'Submitted for Review';
@@ -1287,7 +1291,7 @@ async function submitStudentEnrollment() {
       </div>
     </div>
     <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 mt-3 text-center">
-      📩 Application submitted successfully! Upon approval, the official Student ID & Password will be emailed to you.
+      📩 Application submitted successfully! Upon approval, the official Student ID & Password will be emailed to <b>${parentMatch ? parentMatch.email : 'your email'}</b>.
     </div>`;
 
   btn.textContent = 'Submitted for Review';
