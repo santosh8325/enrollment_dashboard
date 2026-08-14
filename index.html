@@ -1,1346 +1,660 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ScholaLink · Unified Enrollment & Parent Portal Engine</title>
-<!-- Google Fonts & Tailwind CSS -->
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<!-- XLSX Library for Excel Template Download & Parsing -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+// ===========================================================================
+// ScholaLink Dedicated Parent & Student Backend API
+// ===========================================================================
 
-<style>
-:root{
-  --navy:#0b0f19; --navy-2:#151c28; --navy-3:#1e293b;
-  --paper:#070a12; --ink:#f8fafc; --muted:#94a3b8;
-  --teal:#14b8a6; --teal-dark:#0d9488; --teal-tint:rgba(20, 184, 166, 0.12);
-  --orange:#f97316; --err-bg:rgba(239, 68, 68, 0.15); --err-bd:rgba(239, 68, 68, 0.5); --err-tx:#fca5a5;
-  --warn-bg:rgba(245, 158, 11, 0.15); --warn-bd:rgba(245, 158, 11, 0.5); --warn-tx:#fcd34d;
-  --ok-bg:rgba(16, 185, 129, 0.15); --ok-bd:rgba(16, 185, 129, 0.5); --ok-tx:#6ee7b7;
-  --border:#1e293b; --radius:14px;
-}
-*{box-sizing:border-box;}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:'Inter',sans-serif;min-height:100vh;}
-h1,h2,h3,h4{font-family:'Sora',sans-serif;margin:0;}
-.mono{font-family:'IBM Plex Mono',monospace;}
-button{font-family:inherit;cursor:pointer;}
-input,select,textarea{font-family:inherit;font-size:14px;}
+var DRIVE_FOLDER_NAME = "ScholaLink_Uploaded_Documents";
+var DEFAULT_ADMIN_PASSCODE = "3439182";
+var PRIMARY_ADMIN_EMAIL = "foryourhelp360@gmail.com";
 
-/* Navigation Layout */
-.topbar{background:rgba(15, 23, 42, 0.95);color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #1e293b;}
-.brand{display:flex;align-items:center;gap:10px;}
-.brand .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,var(--teal),#6366f1);display:flex;align-items:center;justify-content:center;font-family:'Sora';font-weight:800;font-size:16px;color:#fff;}
-.brand h1{font-size:18px;font-weight:700;letter-spacing:.2px;}
-.brand span{display:block;font-size:11px;color:#94a3b8;font-weight:500;letter-spacing:.4px;}
-.role-select{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.05);padding:6px 14px;border-radius:999px;border:1px solid rgba(255,255,255,.1);}
-.role-select label{font-size:11px;color:#94a3b8;text-transform:uppercase;font-weight:700;}
-.role-select select{background:transparent;color:#38bdf8;border:none;font-size:13px;font-weight:700;outline:none;cursor:pointer;}
-.role-select select option{background:#0f172a;color:#fff;}
-
-/* Navigation Tabs */
-.tabwrap{max-width:1160px;margin:22px auto 0;padding:0 24px;}
-.tabs{display:inline-flex;background:#0f172a;border:1px solid #1e293b;border-radius:999px;padding:4px;}
-.tab{padding:9px 20px;border:none;background:transparent;border-radius:999px;font-weight:600;font-size:13.5px;color:var(--muted);display:flex;align-items:center;gap:6px;transition:all 0.2s;}
-.tab.active{background:#6366f1;color:#fff;box-shadow:0 4px 12px rgba(99, 102, 241, 0.3);}
-.tab.locked{opacity:.5;cursor:not-allowed;}
-
-.container{max-width:1160px;margin:20px auto 60px;padding:0 24px;}
-.card{background:rgba(21, 28, 40, 0.85);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 10px 30px rgba(0,0,0,0.4);}
-
-/* Wizard Components */
-.wizard{display:grid;grid-template-columns:220px 1fr;gap:0;}
-.steprail{border-right:1px solid var(--border);padding:26px 18px;background:rgba(15, 23, 42, 0.5);}
-.steprail .progress{height:4px;background:var(--border);border-radius:99px;margin-bottom:22px;overflow:hidden;}
-.steprail .progress i{display:block;height:100%;background:var(--teal);transition:width .3s ease;}
-.step-item{display:flex;align-items:center;gap:10px;padding:10px 8px;border-radius:10px;font-size:13px;color:var(--muted);font-weight:600;margin-bottom:4px;}
-.step-item .dot{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;}
-.step-item.active{color:#fff;background:var(--teal-tint);}
-.step-item.active .dot{border-color:var(--teal);color:var(--teal);background:rgba(20,184,166,0.1);}
-.step-item.done .dot{background:var(--teal);border-color:var(--teal);color:#0f172a;font-weight:bold;}
-.step-body{padding:28px 34px;min-height:420px;}
-.step-body h2{font-size:19px;margin-bottom:4px;color:#fff;}
-.step-body .sub{color:var(--muted);font-size:13px;margin-bottom:22px;}
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
-.field{margin-bottom:16px;}
-.field label{display:block;font-size:12px;font-weight:600;color:#cbd5e1;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.3px;}
-.field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:99px;outline:none;background:#0f172a;color:#fff;}
-.field textarea{border-radius:12px;}
-.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--teal);box-shadow:0 0 0 2px rgba(20,184,166,0.2);}
-.field .err{color:var(--err-tx);font-size:11.5px;margin-top:5px;display:none;}
-.field.invalid input,.field.invalid select,.field.invalid textarea{border-color:var(--err-bd);background:var(--err-bg);}
-.field.invalid .err{display:block;}
-
-.uploadgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.dropslot{border:1.5px dashed var(--border);border-radius:12px;padding:16px;text-align:center;font-size:12.5px;color:var(--muted);position:relative;background:#0f172a;transition:all 0.2s;}
-.dropslot.filled{border-color:var(--teal);background:var(--teal-tint);color:var(--teal);}
-.dropslot.missing{border-color:var(--err-bd);background:var(--err-bg);}
-.dropslot input[type="file"]{position:absolute;inset:0;opacity:0;cursor:pointer;}
-.dropslot .name{font-weight:700;color:#fff;word-break:break-all;}
-
-.review-summary{display:grid;grid-template-columns:1fr 1fr;gap:12px 24px;font-size:13px;margin-bottom:18px;background:#0f172a;padding:16px;border-radius:12px;border:1px solid var(--border);}
-.review-summary div b{display:block;color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.3px;margin-bottom:2px;}
-
-.wizard-footer{display:flex;justify-content:space-between;align-items:center;padding:18px 34px;border-top:1px solid var(--border);background:rgba(15, 23, 42, 0.5);}
-.btn{border:none;padding:11px 22px;border-radius:10px;font-weight:700;font-size:13.5px;transition:all 0.2s;}
-.btn-ghost{background:#0f172a;border:1px solid var(--border);color:#e2e8f0;}
-.btn-ghost:hover{background:#1e293b;color:#fff;}
-.btn-teal{background:var(--teal);color:#0f172a;}
-.btn-teal:hover{background:#2dd4bf;}
-.btn-orange{background:var(--orange);color:#fff;}
-.btn-orange:hover{background:#fb923c;}
-.btn:disabled{opacity:.45;cursor:not-allowed;}
-
-/* Digital Ticket/Card */
-.ticket{display:grid;grid-template-columns:1fr 210px;border:1px solid #f59e0b;border-radius:16px;overflow:hidden;margin-top:18px;}
-.ticket.approved{border-color:var(--teal);}
-.ticket-main{background:linear-gradient(135deg, #0f172a, #1e293b);color:#fff;padding:26px 28px;position:relative;}
-.ticket-main .tag{font-size:11px;letter-spacing:1.5px;color:#f59e0b;text-transform:uppercase;font-weight:800;}
-.ticket.approved .ticket-main .tag{color:var(--teal);}
-.ticket-main h3{font-size:22px;margin-top:6px;color:#fff;}
-.ticket-main .meta{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;font-size:12.5px;color:#94a3b8;}
-.ticket-main .meta b{color:#fff;display:block;font-family:'IBM Plex Mono';font-size:13px;margin-top:2px;}
-.ticket-stub{background:#f59e0b;color:#0f172a;padding:22px 18px;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;position:relative;border-left:2px dashed rgba(15,23,42,.3);}
-.ticket.approved .ticket-stub{background:var(--teal);}
-.ticket-stub .id{font-family:'IBM Plex Mono';font-size:13px;font-weight:700;letter-spacing:.5px;margin-top:8px;word-break:break-all;}
-.ticket-stub .yr{font-size:34px;font-family:'Sora';font-weight:800;}
-
-/* Bulk Upload Component */
-.bulk-top{display:flex;justify-content:space-between;align-items:center;padding:22px 30px;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:12px;}
-.bulk-top p{margin:4px 0 0;color:var(--muted);font-size:13px;max-width:520px;}
-.dropzone{margin:24px 30px;border:2px dashed var(--border);border-radius:14px;padding:40px 20px;text-align:center;color:var(--muted);transition:.15s;position:relative;background:#0f172a;}
-.dropzone.drag{border-color:var(--teal);background:var(--teal-tint);color:var(--teal);}
-.dropzone input{position:absolute;inset:0;opacity:0;cursor:pointer;}
-.dropzone .big{font-size:15px;font-weight:700;color:#fff;margin-bottom:4px;}
-
-.statbar{display:flex;gap:10px;margin:0 30px 16px;flex-wrap:wrap;}
-.stat{flex:1;min-width:120px;background:#0f172a;border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
-.stat b{display:block;font-size:20px;font-family:'Sora';color:#fff;}
-.stat span{font-size:11.5px;color:var(--muted);font-weight:600;text-transform:uppercase;}
-.stat.err b{color:var(--err-tx);} .stat.warn b{color:var(--warn-tx);} .stat.ok b{color:var(--ok-tx);}
-
-.gridwrap{margin:0 30px 24px;border:1px solid var(--border);border-radius:12px;overflow:auto;max-height:420px;}
-table.preview{border-collapse:collapse;width:100%;font-size:12.5px;}
-table.preview th{position:sticky;top:0;background:#0f172a;color:#38bdf8;text-align:left;padding:9px 10px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--border);}
-table.preview td{padding:8px 10px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap;}
-table.preview tr:hover td{background:#1e293b;}
-
-.bulk-footer{display:flex;justify-content:space-between;align-items:center;padding:18px 30px;border-top:1px solid var(--border);}
-
-/* Admin Control Panel */
-.dash-head{display:flex;justify-content:space-between;align-items:center;padding:24px 30px 6px;flex-wrap:wrap;gap:10px;}
-.dash-head h2{font-size:18px;color:#fff;}
-.dash-head .who{font-size:12px;color:var(--muted);}
-.dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;padding:18px 30px;}
-.dcard{background:#0f172a;border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
-.dcard span{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.3px;}
-.dcard b{display:block;font-family:'Sora';font-size:24px;margin-top:6px;color:#fff;}
-.panel{border:1px solid var(--border);border-radius:12px;padding:18px 20px;background:#0f172a;}
-.panel h4{font-size:13.5px;margin-bottom:14px;color:#fff;}
-
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:90;}
-.modal{background:#151c28;border:1px solid var(--border);border-radius:16px;padding:30px 32px;width:420px;text-align:center;box-shadow:0 20px 40px rgba(0,0,0,0.5);}
-.modal h3{font-size:19px;margin-bottom:6px;color:#fff;}
-.modal .big-stats{display:flex;justify-content:center;gap:26px;margin:20px 0;}
-.modal .big-stats div b{display:block;font-family:'Sora';font-size:26px;}
-.modal .big-stats .g b{color:var(--ok-tx);} .modal .big-stats .r b{color:var(--err-tx);}
-.modal .row{display:flex;gap:10px;margin-top:18px;}
-.modal .row button{flex:1;}
-.hidden{display:none !important;}
-.lockmsg{margin:40px auto;text-align:center;color:var(--muted);max-width:380px;padding:40px 0;}
-.gateerr{color:var(--err-tx);font-size:12px;margin-bottom:10px;min-height:14px;}
-.footnote{text-align:center;font-size:11.5px;color:#64748b;margin-top:16px;}
-</style>
-</head>
-<body>
-
-<!-- Master Admin Passcode Overlay -->
-<div class="modal-bg hidden" id="adminGateOverlay">
-  <div class="modal">
-    <div style="width:52px;height:52px;border-radius:14px;background:rgba(99,102,241,0.15);color:#818cf8;border:1px solid rgba(99,102,241,0.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:20px;">🔐</div>
-    <h3>Super Admin Access</h3>
-    <div style="color:var(--muted);font-size:13px;margin-bottom:16px">Enter the passcode to unlock Administrative privileges.</div>
-    <input type="password" id="adminPassInput" maxlength="12" placeholder="••••••••" style="width:100%;padding:11px 14px;border:1px solid var(--border);border-radius:10px;text-align:center;letter-spacing:3px;font-family:'IBM Plex Mono';font-size:16px;margin-bottom:10px;background:#0f172a;color:#fff;" onkeydown="if(event.key==='Enter')checkAdminPassword()">
-    <div class="gateerr" id="adminGateErr"></div>
-    <button class="btn btn-teal" id="adminUnlockBtn" style="width:100%" onclick="checkAdminPassword()">Unlock Master Admin</button>
-  </div>
-</div>
-
-<!-- Camera Viewport Modal -->
-<div class="modal-bg hidden" id="cameraModal">
-  <div class="modal" style="width:480px">
-    <h3>Capture Document Photo</h3>
-    <div style="color:var(--muted);font-size:12px;margin-bottom:12px">Position your document inside the frame below.</div>
-    <div style="width:100%;height:260px;background:#000;border-radius:12px;overflow:hidden;position:relative;margin-bottom:14px;">
-      <video id="cameraVideo" autoplay playsinline style="width:100%;height:100%;object-fit:cover;"></video>
-      <canvas id="cameraCanvas" class="hidden"></canvas>
-    </div>
-    <div class="flex space-x-3">
-      <button class="btn btn-ghost flex-1" onclick="stopCamera()">Cancel</button>
-      <button class="btn btn-teal flex-1" onclick="takeSnapshot()">Take Snapshot</button>
-    </div>
-  </div>
-</div>
-
-<!-- Admin Password Change Modal -->
-<div class="modal-bg hidden" id="changeAdminPassModal">
-  <div class="modal" style="width:400px;text-align:left;">
-    <h3 class="mb-2 text-center text-indigo-400">🔑 Change Master Admin Passcode</h3>
-    <div class="text-slate-400 text-xs mb-4 text-center">Updates the Master Admin Passcode on Google Server properties.</div>
-    <div class="field">
-      <label>Current Passcode</label>
-      <input type="password" id="adminOldPassInp" placeholder="Enter current passcode">
-    </div>
-    <div class="field">
-      <label>New Passcode</label>
-      <input type="password" id="adminNewPassInp" placeholder="Enter new passcode">
-    </div>
-    <div class="field">
-      <label>Confirm New Passcode</label>
-      <input type="password" id="adminConfirmPassInp" placeholder="Re-enter new passcode">
-    </div>
-    <div id="adminPassChangeErr" class="text-red-400 text-xs mb-3 font-semibold"></div>
-    <div class="flex space-x-3">
-      <button class="btn btn-ghost flex-1" onclick="closeAdminPassModal()">Cancel</button>
-      <button class="btn btn-teal flex-1" onclick="submitAdminPasscodeChange()">Save New Passcode</button>
-    </div>
-  </div>
-</div>
-
-<!-- User Self-Service Password Change Modal -->
-<div class="modal-bg hidden" id="userPassModal">
-  <div class="modal" style="width:400px;text-align:left;">
-    <h3 class="mb-2 text-center text-teal-400">🔐 User Password Self-Service</h3>
-    <div class="text-slate-400 text-xs mb-4 text-center">Update your access password (Allowed <b>max 3 times per month</b>).</div>
-    <div class="field">
-      <label>Official ID (Parent or Student ID)</label>
-      <input type="text" id="userPassId" placeholder="e.g. PAR-2026-1001 or SL-2026-1002" class="mono uppercase">
-    </div>
-    <div class="field">
-      <label>Current Password</label>
-      <input type="password" id="userPassOld" placeholder="Enter current password">
-    </div>
-    <div class="field">
-      <label>New Password</label>
-      <input type="password" id="userPassNew" placeholder="Min 4 characters">
-    </div>
-    <div class="field">
-      <label>Confirm New Password</label>
-      <input type="password" id="userPassConfirm" placeholder="Re-enter new password">
-    </div>
-    <div id="userPassErr" class="text-red-400 text-xs mb-3 font-semibold"></div>
-    <div class="flex space-x-3">
-      <button class="btn btn-ghost flex-1" onclick="closeUserPassModal()">Cancel</button>
-      <button class="btn btn-teal flex-1" id="saveUserPassBtn" onclick="submitUserPasswordChange()">Update Password</button>
-    </div>
-  </div>
-</div>
-
-<div class="topbar">
-  <div class="brand">
-    <div class="mark">SL</div>
-    <div><h1>ScholaLink</h1><span>Student Enrollment & Parent Portal Engine</span></div>
-  </div>
-  
-  <div class="flex items-center space-x-4">
-    <button class="btn btn-ghost text-xs py-1.5 px-3 border-teal-500/40 text-teal-300" onclick="openUserPassModal()">
-      🔑 User Change Password
-    </button>
-    <div class="role-select">
-      <label>Viewing As</label>
-      <select id="roleSelect" onchange="handleRoleChange(this.value)">
-        <option value="public" selected>Public / Parent (Unprotected)</option>
-        <option value="user_portal">Approved User Portal (Parents & Students)</option>
-        <option value="admin">Admin (Passcode Required)</option>
-      </select>
-    </div>
-  </div>
-</div>
-
-<div class="tabwrap">
-  <div class="tabs">
-    <button class="tab active" id="tabSingleBtn" onclick="switchTab('single')"><i class="fas fa-file-signature"></i> Registration Portal</button>
-    <button class="tab hidden" id="tabUserPortalBtn" onclick="switchTab('user_portal')"><i class="fas fa-id-badge"></i> My Approved Portal</button>
-    <button class="tab locked" id="tabBulkBtn" onclick="switchTab('bulk')"><i class="fas fa-file-csv"></i> Mass Batch Onboarding <span class="lock" id="bulkLockIcon">🔒</span></button>
-    <button class="tab locked" id="tabDashBtn" onclick="switchTab('dashboard')"><i class="fas fa-chart-pie"></i> Admin Approval & Control <span class="lock" id="dashLockIcon">🔒</span></button>
-  </div>
-</div>
-
-<div class="container">
-
-  <!-- ================= MODULE A: APPLICATION & REGISTRATION WIZARD ================= -->
-  <div class="card" id="singlePane">
-    <div class="wizard">
-      <div class="steprail">
-        <div class="progress"><i id="progressFill" style="width:20%"></i></div>
-        <div id="stepList"></div>
-      </div>
-      <div>
-        <div class="step-body" id="stepBody"></div>
-        <div class="wizard-footer">
-          <button class="btn btn-ghost" id="backBtn" onclick="prevStep()">Back</button>
-          <div class="mono" style="font-size:11px;color:var(--teal)" id="refPreview"></div>
-          <button class="btn btn-teal" id="nextBtn" onclick="nextStep()">Continue</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- ================= MODULE B: USER PORTAL LOGIN & BADGE ================= -->
-  <div class="card hidden p-8" id="userPortalPane">
-    <div class="max-w-md mx-auto" id="userLoginBox">
-      <div class="text-center mb-6">
-        <div class="w-14 h-14 rounded-2xl bg-teal-500/10 border border-teal-500/30 text-teal-400 flex items-center justify-center mx-auto mb-3 text-2xl">
-          <i class="fas fa-id-card"></i>
-        </div>
-        <h2 class="text-xl font-bold text-white">Approved User Portal Sign In</h2>
-        <p class="text-xs text-slate-400 mt-1">Enter your Official ID and Password sent in your approval confirmation email.</p>
-      </div>
-
-      <div class="field">
-        <label>Official ID (Parent or Student ID)</label>
-        <input type="text" id="loginOfficialId" placeholder="e.g. PAR-2026-1001 or SL-2026-1002" class="mono uppercase">
-      </div>
-      <div class="field">
-        <label>Password</label>
-        <input type="password" id="loginPassword" placeholder="Enter your password">
-      </div>
-      <div id="userLoginErr" class="text-red-400 text-xs mb-3 font-semibold text-center"></div>
-      <button class="btn btn-teal w-full" id="userLoginBtn" onclick="performUserLogin()">Sign In to Portal</button>
-    </div>
-
-    <div id="userProfileContent" class="hidden max-w-2xl mx-auto space-y-6"></div>
-  </div>
-
-  <!-- ================= MODULE C: BULK UPLOAD ================= -->
-  <div class="card hidden" id="bulkPane">
-    <div class="bulk-top">
-      <div>
-        <h2 style="font-size:18px;color:#fff;">Mass Batch Onboarding</h2>
-        <p>Upload a CSV/XLSX batch of student applicants. Records synchronize directly with Google Sheets.</p>
-      </div>
-      <button class="btn btn-ghost" onclick="downloadTemplate()"><i class="fas fa-download mr-1"></i> Download Template (.xlsx)</button>
-    </div>
-
-    <div class="dropzone" id="dropzone">
-      <div class="big"><i class="fas fa-cloud-arrow-up text-2xl text-teal-400 mb-2 block"></i>Drop your file here, or click to browse</div>
-      <div>.csv, .xlsx, .xls — up to 20MB</div>
-      <input type="file" id="fileInput" accept=".csv,.xlsx,.xls">
-    </div>
-
-    <div id="bulkResults" class="hidden">
-      <div class="statbar">
-        <div class="stat"><span>Total Rows</span><b id="statTotal">0</b></div>
-        <div class="stat ok"><span>Ready</span><b id="statOk">0</b></div>
-        <div class="stat warn"><span>Warnings</span><b id="statWarn">0</b></div>
-        <div class="stat err"><span>Errors</span><b id="statErr">0</b></div>
-      </div>
-      <div class="gridwrap"><table class="preview" id="previewTable"></table></div>
-      <div class="bulk-footer">
-        <span style="font-size:12px;color:var(--muted)">Double-click any cell to correct it, then re-validate.</span>
-        <div style="display:flex;gap:10px">
-          <button class="btn btn-ghost" onclick="revalidateAll()">Re-validate</button>
-          <button class="btn btn-orange" id="processBtn" onclick="processBulk()">Process Bulk Registration</button>
-        </div>
-      </div>
-    </div>
-
-    <div class="lockmsg hidden" id="bulkLock">
-      🔒 Mass Onboarding is restricted to <b>Admin</b> role.
-    </div>
-  </div>
-
-  <!-- ================= MODULE D: ADMIN DASHBOARD ================= -->
-  <div class="card hidden" id="dashPane">
-    <div class="lockmsg" id="dashRoleLock">
-      🔒 The Dashboard is restricted to the <b>Admin</b> role.
-    </div>
-    <div class="hidden" id="dashContent"></div>
-  </div>
-
-  <p class="footnote">
-    <i class="fas fa-cloud-check text-teal-400 mr-1"></i> Connected to Google Sheets Database API. Submissions enter a "Pending Approval" state for Admin document review.
-  </p>
-</div>
-
-<script>
-// Deployed Google Apps Script Endpoint URL
-const GOOGLE_APPS_SCRIPT_API_URL = "https://script.google.com/macros/s/AKfycbzxJkXlu28o5opF1zRjySacrK-p2sOwdOzo8lEv_I3YOtPkzkmSuP1mP1chnfh0_U-T/exec";
-
-// Master Admin Passcode & Session Token
-let currentAdminPasscode = "3439182";
-let adminSessionToken = null;
-
-// Central Live State Store
-const DB = {
-  students: [],
-  parents: [
-    {requestId:"PAR-REQ-1001", parentId:"PAR-2026-1001", fullName:"Suresh Mehta", email:"suresh.mehta@gmail.com", phone:"9845011223", status:"Approved", password:"Schola#20261001"}
-  ],
-  gradeCapacity: {
-    "Grade 1":{max:40,current:31}, "Grade 2":{max:40,current:37},
-    "Grade 3":{max:40,current:22}, "Grade 4":{max:35,current:34},
-    "Grade 5":{max:35,current:19}, "Grade 6":{max:35,current:33},
-    "Grade 7":{max:30,current:12}, "Grade 8":{max:30,current:9}
-  }
-};
-
-let bulkData = [];
-let activeCameraSlot = null;
-let mediaStream = null;
-let loggedInUser = null;
-
-function seatsLeft(grade){
-  const g = DB.gradeCapacity[grade];
-  return g ? g.max - g.current : null;
-}
-
-// Convert file blob to base64 object for Google Drive upload
-function fileToBase64(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => {
-      const base64String = reader.result.split(',')[1];
-      resolve({
-        name: file.name,
-        mimeType: file.type,
-        base64: base64String
+function doGet(e) {
+  try {
+    var params = e ? e.parameter : {};
+    var action = params.action || 'getAllRecords';
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // One-Click Email Approval & Rejection from Inbox
+    if (action === 'approveRecordEmail' || action === 'rejectRecordEmail') {
+      return handleEmailActionLink(ss, params);
+    }
+    
+    if (action === 'getAllRecords') {
+      var parentSheet = getOrCreateSheet(ss, "Parents");
+      var studentSheet = getOrCreateSheet(ss, "Enrollments");
+      
+      var parentData = getSheetRowsAsObjects(parentSheet);
+      var studentData = getSheetRowsAsObjects(studentSheet);
+      
+      return createJsonResponse({
+        status: 'success',
+        parents: parentData,
+        students: studentData
       });
-    };
-    reader.onerror = error => reject(error);
-  });
-}
-
-function getAgeInYears(dobString) {
-  if (!dobString) return 0;
-  const dob = new Date(dobString);
-  const today = new Date();
-  let age = today.getFullYear() - dob.getFullYear();
-  const monthDiff = today.getMonth() - dob.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
-    age--;
-  }
-  return age;
-}
-
-async function syncDataToGoogleSheet(action, payload) {
-  try {
-    const res = await fetch(GOOGLE_APPS_SCRIPT_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({
-        action: action,
-        payload: payload,
-        updatedAt: new Date().toISOString()
-      })
-    });
-    if (res.ok) {
-      return await res.json();
     }
+    
+    return createJsonResponse({ status: 'unknown_action' });
   } catch (err) {
-    console.warn("GAS Sync Warning:", err);
+    return createJsonResponse({ status: 'error', message: err.toString() });
   }
-  return null;
 }
 
-async function fetchGoogleSheetDatabase() {
+function doPost(e) {
   try {
-    const res = await fetch(`${GOOGLE_APPS_SCRIPT_API_URL}?action=getAllRecords&t=${Date.now()}`);
-    if (res.ok) {
-      const data = await res.json();
-      if (data && Array.isArray(data.parents)) {
-        DB.parents = data.parents;
-      }
-      if (data && Array.isArray(data.students)) {
-        DB.students = data.students;
-      }
-      if (adminSessionToken) {
-        renderDashboard();
-      }
+    if (!e || !e.postData || !e.postData.contents) {
+      return createJsonResponse({ status: 'error', message: 'No POST data received' });
     }
+    
+    var body = JSON.parse(e.postData.contents);
+    var action = body.action;
+    var payload = body.payload || {};
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    
+    // Public Unprotected Actions
+    if (action === 'registerParent') {
+      return processParentRegistration(ss, payload);
+    } else if (action === 'submitStudent') {
+      return processStudentApplication(ss, payload);
+    } else if (action === 'userLogin') {
+      return processUserLogin(ss, payload);
+    } else if (action === 'changeUserPassword') {
+      return processChangeUserPassword(ss, payload);
+    }
+    
+    // Admin Authentication Verification
+    if (action === 'verifyAdminPasscode') {
+      return handleAdminAuthentication(payload);
+    }
+    
+    // Protected Admin-Only Actions
+    if (!verifyAdminAuthToken(payload.adminToken)) {
+      return createJsonResponse({ status: 'unauthorized', message: 'Access Denied: Invalid or expired Admin Session Credentials.' });
+    }
+    
+    if (action === 'approveRecord') {
+      return processApproval(ss, payload);
+    } else if (action === 'rejectRecord') {
+      return processRejection(ss, payload);
+    } else if (action === 'changeAdminPasscode') {
+      return processChangeAdminPasscode(payload);
+    } else if (action === 'bulkStudentUpload') {
+      return processBulkStudentUpload(ss, payload);
+    }
+    
+    return createJsonResponse({ status: 'error', message: 'Invalid action specified' });
   } catch (err) {
-    console.warn("Fetch Database Notice:", err);
+    return createJsonResponse({ status: 'error', message: err.toString() });
   }
 }
 
-function handleRoleChange(selectedRole) {
-  if (selectedRole === 'admin' && !adminSessionToken) {
-    document.getElementById('adminGateOverlay').classList.remove('hidden');
-    setTimeout(() => document.getElementById('adminPassInput').focus(), 100);
-  } else if (selectedRole === 'public') {
-    applyRoleGates();
-  } else if (selectedRole === 'user_portal') {
-    switchTab('user_portal');
-  }
+function getSavedAdminPasscode() {
+  var props = PropertiesService.getScriptProperties();
+  var saved = props.getProperty('ADMIN_PASSCODE');
+  return saved || DEFAULT_ADMIN_PASSCODE;
 }
 
-async function checkAdminPassword() {
-  const input = document.getElementById('adminPassInput');
-  const err = document.getElementById('adminGateErr');
-  const btn = document.getElementById('adminUnlockBtn');
-
-  btn.disabled = true;
-  btn.textContent = 'Verifying Passcode...';
-
-  const response = await syncDataToGoogleSheet('verifyAdminPasscode', {
-    passcode: input.value,
-    rawPasscode: currentAdminPasscode
-  });
-
-  btn.disabled = false;
-  btn.textContent = 'Unlock Master Admin';
-
-  if (response && response.status === 'success') {
-    adminSessionToken = response.adminToken;
-    currentAdminPasscode = input.value;
-    err.textContent = '';
-    input.value = '';
-    document.getElementById('adminGateOverlay').classList.add('hidden');
-    applyRoleGates();
-    await fetchGoogleSheetDatabase();
-  } else {
-    err.textContent = 'Incorrect passcode. Try again.';
-  }
-}
-
-function applyRoleGates() {
-  const role = document.getElementById('roleSelect').value;
-  const isSuperAdmin = (role === 'admin' && adminSessionToken);
-
-  document.getElementById('tabBulkBtn').classList.toggle('locked', !isSuperAdmin);
-  document.getElementById('bulkLockIcon').classList.toggle('hidden', isSuperAdmin);
+function handleAdminAuthentication(payload) {
+  var passcodeIn = (payload.passcode || '').toString().trim();
+  var currentPasscode = getSavedAdminPasscode();
   
-  document.getElementById('tabDashBtn').classList.toggle('locked', !isSuperAdmin);
-  document.getElementById('dashLockIcon').classList.toggle('hidden', isSuperAdmin);
-
-  document.getElementById('tabUserPortalBtn').classList.toggle('hidden', role !== 'user_portal');
-
-  document.getElementById('dashRoleLock').classList.toggle('hidden', isSuperAdmin);
-  document.getElementById('bulkLock').classList.toggle('hidden', isSuperAdmin);
-
-  if (isSuperAdmin) {
-    renderDashboard();
-  }
-}
-
-function switchTab(tab) {
-  const role = document.getElementById('roleSelect').value;
-  const isSuperAdmin = (role === 'admin' && adminSessionToken);
-
-  if ((tab === 'bulk' || tab === 'dashboard') && !isSuperAdmin) {
-    handleRoleChange('admin');
-    document.getElementById('roleSelect').value = 'admin';
-    return;
-  }
-
-  document.getElementById('tabSingleBtn').classList.toggle('active', tab==='single');
-  document.getElementById('tabUserPortalBtn').classList.toggle('active', tab==='user_portal');
-  document.getElementById('tabBulkBtn').classList.toggle('active', tab==='bulk');
-  document.getElementById('tabDashBtn').classList.toggle('active', tab==='dashboard');
-
-  document.getElementById('singlePane').classList.toggle('hidden', tab!=='single');
-  document.getElementById('userPortalPane').classList.toggle('hidden', tab!=='user_portal');
-  document.getElementById('bulkPane').classList.toggle('hidden', tab!=='bulk');
-  document.getElementById('dashPane').classList.toggle('hidden', tab!=='dashboard');
-
-  if (tab === 'dashboard' && isSuperAdmin) {
-    fetchGoogleSheetDatabase().then(() => renderDashboard());
-  }
-}
-
-function renderDashboard() {
-  // Enhanced filtering to capture any pending/unapproved status
-  const pendingParents = DB.parents.filter(p => {
-    const st = (p.status || '').toString().toLowerCase();
-    const pid = (p.parentId || '').toString().toLowerCase();
-    return st.includes('pending') || st.includes('unapproved') || st.includes('under') || pid.includes('pending');
-  });
-
-  const pendingStudents = DB.students.filter(s => {
-    const st = (s.status || '').toString().toLowerCase();
-    const sid = (s.studentId || '').toString().toLowerCase();
-    return st.includes('pending') || st.includes('unapproved') || st.includes('under') || sid.includes('pending');
-  });
-  
-  const approvedParents = DB.parents.filter(p => (p.status || '').toString().toLowerCase() === 'approved' && p.parentId !== 'PENDING APPROVAL').length;
-  const approvedStudents = DB.students.filter(s => (s.status || '').toString().toLowerCase() === 'approved' && s.studentId !== 'PENDING APPROVAL').length;
-
-  const totalSeats = Object.values(DB.gradeCapacity).reduce((a,g)=>a+g.max,0);
-  const filledSeats = Object.values(DB.gradeCapacity).reduce((a,g)=>a+g.current,0);
-
-  const pendingParentRows = pendingParents.map(p => `
-    <tr class="border-b border-slate-800">
-      <td class="p-3 mono text-teal-400 font-semibold">${p.requestId || p.parentId || 'PAR-REQ'}</td>
-      <td class="p-3 text-white font-bold">${p.fullName || '—'}</td>
-      <td class="p-3 text-slate-300">${p.email || '—'}<br><span class="text-slate-500">${p.phone || '—'}</span></td>
-      <td class="p-3">
-        <div class="flex gap-2">
-          ${p.doc1Url ? `<a href="${p.doc1Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-pdf mr-1"></i> ID 1</a>` : ''}
-          ${p.doc2Url ? `<a href="${p.doc2Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-pdf mr-1"></i> ID 2</a>` : ''}
-          ${p.doc3Url ? `<a href="${p.doc3Url}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-pdf mr-1"></i> ID 3</a>` : ''}
-        </div>
-      </td>
-      <td class="p-3 text-right">
-        <button class="btn btn-teal text-xs py-1 px-3" onclick="approveRecordInAdmin('${p.requestId || p.parentId}', 'parent')">✓ Approve & Issue Credentials</button>
-        <button class="btn btn-ghost text-xs py-1 px-2 text-red-400 ml-1" onclick="rejectRecordInAdmin('${p.requestId || p.parentId}', 'parent')">✕ Reject</button>
-      </td>
-    </tr>`).join('') || `<tr><td colspan="5" class="p-4 text-center text-slate-500"><i class="fas fa-circle-check text-emerald-400 mr-2"></i>No pending parent registrations queue.</td></tr>`;
-
-  const pendingStudentRows = pendingStudents.map(s => `
-    <tr class="border-b border-slate-800">
-      <td class="p-3 mono text-teal-400 font-semibold">${s.requestId || s.studentId || 'SL-REQ'}</td>
-      <td class="p-3 text-white font-bold">${s.fullName || '—'}</td>
-      <td class="p-3 text-slate-300">${s.gradeApplying || '—'}</td>
-      <td class="p-3 text-slate-400 font-mono">${s.parentId || '—'}</td>
-      <td class="p-3">
-        ${s.birthCertUrl ? `<a href="${s.birthCertUrl}" target="_blank" class="px-2 py-1 bg-slate-800 text-teal-300 rounded border border-slate-700 text-xs"><i class="fas fa-file-image mr-1"></i> Birth Cert</a>` : '—'}
-      </td>
-      <td class="p-3 text-right">
-        <button class="btn btn-teal text-xs py-1 px-3" onclick="approveRecordInAdmin('${s.requestId || s.studentId}', 'student')">✓ Approve & Issue Credentials</button>
-        <button class="btn btn-ghost text-xs py-1 px-2 text-red-400 ml-1" onclick="rejectRecordInAdmin('${s.requestId || s.studentId}', 'student')">✕ Reject</button>
-      </td>
-    </tr>`).join('') || `<tr><td colspan="6" class="p-4 text-center text-slate-500"><i class="fas fa-circle-check text-emerald-400 mr-2"></i>No pending student enrollments queue.</td></tr>`;
-
-  document.getElementById('dashContent').innerHTML = `
-    <div class="dash-head">
-      <div>
-        <h2>Master Control & Pending Approvals Queue</h2>
-        <div class="who">Role: <b style="color:var(--teal)">Super Admin</b></div>
-      </div>
-      <div class="flex gap-2">
-        <button class="btn btn-ghost text-xs py-1.5 px-3 border-teal-500/40 text-teal-300" onclick="fetchGoogleSheetDatabase()">
-          <i class="fas fa-sync-alt mr-1"></i> Refresh Queue
-        </button>
-        <button class="btn btn-ghost text-xs py-1.5 px-3 border-indigo-500/40 text-indigo-300" onclick="openAdminPassModal()">
-          🔑 Change Admin Passcode
-        </button>
-      </div>
-    </div>
-    <div class="dash-grid">
-      <div class="dcard"><span>Pending Queue</span><b class="text-amber-400">${pendingParents.length + pendingStudents.length}</b></div>
-      <div class="dcard"><span>Approved Parents</span><b>${approvedParents}</b></div>
-      <div class="dcard"><span>Approved Students</span><b>${approvedStudents}</b></div>
-      <div class="dcard"><span>Filled Seats</span><b>${filledSeats}/${totalSeats}</b></div>
-    </div>
-
-    <div class="px-7 py-4 space-y-6">
-      <div class="panel">
-        <div class="flex justify-between items-center mb-3">
-          <h4 class="text-amber-400"><i class="fas fa-clock mr-2"></i>Pending Parent Registrations Queue (${pendingParents.length})</h4>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr class="text-slate-400 border-b border-slate-800">
-                <th class="p-2">Request Ref</th>
-                <th class="p-2">Applicant Name</th>
-                <th class="p-2">Contact Info</th>
-                <th class="p-2">Attached ID Vault</th>
-                <th class="p-2 text-right">Admin Action</th>
-              </tr>
-            </thead>
-            <tbody>${pendingParentRows}</tbody>
-          </table>
-        </div>
-      </div>
-
-      <div class="panel">
-        <div class="flex justify-between items-center mb-3">
-          <h4 class="text-amber-400"><i class="fas fa-graduation-cap mr-2"></i>Pending Student Enrollments Queue (${pendingStudents.length})</h4>
-        </div>
-        <div class="overflow-x-auto">
-          <table class="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr class="text-slate-400 border-b border-slate-800">
-                <th class="p-2">Request Ref</th>
-                <th class="p-2">Student Name</th>
-                <th class="p-2">Grade</th>
-                <th class="p-2">Parent ID</th>
-                <th class="p-2">Birth Cert</th>
-                <th class="p-2 text-right">Admin Action</th>
-              </tr>
-            </thead>
-            <tbody>${pendingStudentRows}</tbody>
-          </table>
-        </div>
-      </div>
-    </div>`;
-}
-
-async function approveRecordInAdmin(reqId, type) {
-  if (!confirm(`Are you sure you want to APPROVE and issue official credentials for ${reqId}?`)) return;
-
-  const res = await syncDataToGoogleSheet('approveRecord', {
-    adminToken: adminSessionToken,
-    requestId: reqId,
-    type: type
-  });
-
-  if (res && res.status === 'success') {
-    alert(`🎉 Record ${reqId} Approved!\n\nOfficial ID: ${res.officialId}\nInitial Password: ${res.initialPassword}\n\nAn official approval email with credentials has been sent to the applicant.`);
-    await fetchGoogleSheetDatabase();
-  } else {
-    alert('Failed to approve record. Session may be expired or Request ID not found.');
-  }
-}
-
-async function rejectRecordInAdmin(reqId, type) {
-  if (confirm(`Are you sure you want to REJECT request ${reqId}?`)) {
-    await syncDataToGoogleSheet('rejectRecord', {
-      adminToken: adminSessionToken,
-      requestId: reqId,
-      type: type
+  if (passcodeIn === currentPasscode) {
+    var timestamp = new Date().getTime();
+    var sessionToken = "SL-ADM-TOK-" + timestamp + "-" + Math.floor(1000 + Math.random() * 9000);
+    
+    var scriptProperties = PropertiesService.getScriptProperties();
+    scriptProperties.setProperty(sessionToken, timestamp.toString());
+    
+    return createJsonResponse({
+      status: 'success',
+      adminToken: sessionToken,
+      expiresAt: timestamp + (8 * 60 * 60 * 1000)
     });
-    await fetchGoogleSheetDatabase();
   }
+  
+  return createJsonResponse({
+    status: 'error',
+    message: 'Incorrect Admin Passcode.'
+  });
 }
 
-function openAdminPassModal() {
-  document.getElementById('changeAdminPassModal').classList.remove('hidden');
-}
-function closeAdminPassModal() {
-  document.getElementById('changeAdminPassModal').classList.add('hidden');
+function verifyAdminAuthToken(token) {
+  if (!token) return false;
+  var scriptProperties = PropertiesService.getScriptProperties();
+  var tokenTimestamp = scriptProperties.getProperty(token);
+  if (tokenTimestamp) {
+    var createdTime = parseInt(tokenTimestamp, 10);
+    var now = new Date().getTime();
+    if (now - createdTime < 8 * 60 * 60 * 1000) {
+      return true;
+    }
+  }
+  return false;
 }
 
-async function submitAdminPasscodeChange() {
-  const oldPass = document.getElementById('adminOldPassInp').value;
-  const newPass = document.getElementById('adminNewPassInp').value;
-  const confirmPass = document.getElementById('adminConfirmPassInp').value;
-  const err = document.getElementById('adminPassChangeErr');
-
+function processChangeAdminPasscode(payload) {
+  var oldPass = (payload.oldPasscode || '').toString().trim();
+  var newPass = (payload.newPasscode || '').toString().trim();
+  var currentPass = getSavedAdminPasscode();
+  
+  if (oldPass !== currentPass) {
+    return createJsonResponse({ status: 'error', message: 'Current passcode is incorrect.' });
+  }
   if (newPass.length < 6) {
-    err.textContent = 'New passcode must be at least 6 characters.';
-    return;
+    return createJsonResponse({ status: 'error', message: 'New passcode must be at least 6 characters.' });
   }
-  if (newPass !== confirmPass) {
-    err.textContent = 'New passcodes do not match.';
-    return;
-  }
+  
+  PropertiesService.getScriptProperties().setProperty('ADMIN_PASSCODE', newPass);
+  return createJsonResponse({ status: 'success', message: 'Admin passcode updated successfully.' });
+}
 
-  const res = await syncDataToGoogleSheet('changeAdminPasscode', {
-    adminToken: adminSessionToken,
-    oldPasscode: oldPass,
-    newPasscode: newPass
+function processParentRegistration(ss, payload) {
+  var parent = payload.parent || {};
+  var documents = payload.documents || {};
+  var driveFolder = getOrCreateDriveFolder(DRIVE_FOLDER_NAME);
+  
+  var reqId = "PAR-REQ-" + Math.floor(1000 + Math.random() * 9000);
+  
+  var docUrls = {};
+  for (var key in documents) {
+    if (documents[key] && documents[key].base64) {
+      var fileBlob = Utilities.newBlob(
+        Utilities.base64Decode(documents[key].base64),
+        documents[key].mimeType || 'application/octet-stream',
+        reqId + '_' + key + '_' + (documents[key].name || 'doc')
+      );
+      var createdFile = driveFolder.createFile(fileBlob);
+      createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      docUrls[key] = createdFile.getUrl();
+    }
+  }
+  
+  var sheet = getOrCreateSheet(ss, "Parents");
+  ensureHeaders(sheet, [
+    "parentId", "fullName", "dob", "gender", "nationality", "email", "phone", 
+    "street", "city", "doc1Url", "doc2Url", "doc3Url", "status", "password", 
+    "passChangeCount", "lastPassChangeMonth", "registeredAt", "requestId"
+  ]);
+  
+  sheet.appendRow([
+    "PENDING APPROVAL",
+    parent.fullName || "",
+    parent.dob || "",
+    parent.gender || "",
+    parent.nationality || "Indian",
+    parent.email || "",
+    parent.phone || "",
+    parent.street || "",
+    parent.city || "",
+    docUrls["doc1"] || "",
+    docUrls["doc2"] || "",
+    docUrls["doc3"] || "",
+    "Pending Approval",
+    "",
+    0,
+    "",
+    new Date().toISOString(),
+    reqId
+  ]);
+  
+  sendAdminNotificationEmail({
+    type: "Parent Registration",
+    reqId: reqId,
+    applicantName: parent.fullName,
+    email: parent.email,
+    phone: parent.phone,
+    docUrls: docUrls
   });
-
-  if (res && res.status === 'success') {
-    currentAdminPasscode = newPass;
-    alert('Master Admin Passcode updated successfully on Google server properties!');
-    closeAdminPassModal();
-  } else {
-    err.textContent = res ? res.message : 'Error updating passcode.';
-  }
+  
+  return createJsonResponse({ status: 'success', requestId: reqId });
 }
 
-async function performUserLogin() {
-  const officialId = document.getElementById('loginOfficialId').value.trim().toUpperCase();
-  const password = document.getElementById('loginPassword').value;
-  const err = document.getElementById('userLoginErr');
-  const btn = document.getElementById('userLoginBtn');
-
-  if (!officialId || !password) {
-    err.textContent = 'Please enter both Official ID and Password.';
-    return;
+function processStudentApplication(ss, payload) {
+  var student = payload.student || {};
+  var documents = payload.documents || {};
+  var driveFolder = getOrCreateDriveFolder(DRIVE_FOLDER_NAME);
+  
+  var reqId = "SL-REQ-" + Math.floor(1000 + Math.random() * 9000);
+  
+  var birthCertUrl = "";
+  if (documents["birthCert"] && documents["birthCert"].base64) {
+    var fileBlob = Utilities.newBlob(
+      Utilities.base64Decode(documents["birthCert"].base64),
+      documents["birthCert"].mimeType || 'application/octet-stream',
+      reqId + '_birthCert_' + (documents["birthCert"].name || 'doc')
+    );
+    var createdFile = driveFolder.createFile(fileBlob);
+    createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    birthCertUrl = createdFile.getUrl();
   }
-
-  btn.disabled = true;
-  btn.textContent = 'Verifying Credentials...';
-
-  const res = await syncDataToGoogleSheet('userLogin', {
-    id: officialId,
-    password: password
+  
+  var sheet = getOrCreateSheet(ss, "Enrollments");
+  ensureHeaders(sheet, [
+    "studentId", "fullName", "dob", "gender", "gradeApplying", "parentId", 
+    "guardianName", "guardianEmail", "guardianPhone", "birthCertUrl", "status", 
+    "password", "passChangeCount", "lastPassChangeMonth", "submittedAt", "requestId"
+  ]);
+  
+  sheet.appendRow([
+    "PENDING APPROVAL",
+    student.fullName || "",
+    student.dob || "",
+    student.gender || "",
+    student.gradeApplying || "",
+    student.parentId || "",
+    student.guardianName || "",
+    student.guardianEmail || "",
+    student.guardianPhone || "",
+    birthCertUrl,
+    "Pending Approval",
+    "",
+    0,
+    "",
+    new Date().toISOString(),
+    reqId
+  ]);
+  
+  sendAdminNotificationEmail({
+    type: "Student Application (" + student.gradeApplying + ")",
+    reqId: reqId,
+    applicantName: student.fullName,
+    email: student.guardianEmail,
+    phone: student.guardianPhone,
+    docUrls: { birthCert: birthCertUrl }
   });
+  
+  return createJsonResponse({ status: 'success', requestId: reqId });
+}
 
-  btn.disabled = false;
-  btn.textContent = 'Sign In to Portal';
+function generateInitialPassword() {
+  return "Schola#" + Math.floor(1000 + Math.random() * 9000);
+}
 
-  if (res && res.status === 'success') {
-    loggedInUser = res.user;
-    err.textContent = '';
-    renderUserProfileBadge();
+function findPendingRowIndex(sheet, reqId, email) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return -1;
+  var headers = data[0].map(function(h){ return h.toString().toLowerCase().replace(/[^a-z0-9]/g, ''); });
+  
+  var reqIdCol = headers.indexOf("requestid");
+  var parentIdCol = headers.indexOf("parentid");
+  var studentIdCol = headers.indexOf("studentid");
+  var emailCol = headers.indexOf("email");
+  if (emailCol === -1) emailCol = headers.indexOf("guardianemail");
+  
+  var targetReq = (reqId || '').toString().trim().toUpperCase();
+  var targetEmail = (email || '').toString().trim().toUpperCase();
+  
+  for (var i = 1; i < data.length; i++) {
+    var row = data[i];
+    var rId = reqIdCol !== -1 ? (row[reqIdCol] || '').toString().trim().toUpperCase() : '';
+    var pId = parentIdCol !== -1 ? (row[parentIdCol] || '').toString().trim().toUpperCase() : '';
+    var sId = studentIdCol !== -1 ? (row[studentIdCol] || '').toString().trim().toUpperCase() : '';
+    var em = emailCol !== -1 ? (row[emailCol] || '').toString().trim().toUpperCase() : '';
+    
+    if (targetReq && (rId === targetReq || pId === targetReq || sId === targetReq)) {
+      return i + 1;
+    }
+    if (targetEmail && em === targetEmail && (pId === 'PENDING APPROVAL' || sId === 'PENDING APPROVAL' || rId.indexOf('REQ') !== -1)) {
+      return i + 1;
+    }
+  }
+  
+  // Fallback: match any row with status = Pending Approval if only 1 row is pending
+  var statusCol = headers.indexOf("status");
+  if (statusCol !== -1) {
+    for (var j = 1; j < data.length; j++) {
+      var st = (data[j][statusCol] || '').toString().toLowerCase();
+      if (st.indexOf('pending') !== -1 || st.indexOf('unapproved') !== -1) {
+        return j + 1;
+      }
+    }
+  }
+  
+  return -1;
+}
+
+function processApproval(ss, payload) {
+  var reqId = payload.requestId;
+  var email = payload.email;
+  var recordType = payload.type;
+  
+  if (recordType === 'parent') {
+    var sheet = getOrCreateSheet(ss, "Parents");
+    var rowIdx = findPendingRowIndex(sheet, reqId, email);
+    if (rowIdx > 0) {
+      var officialParentId = "PAR-2026-" + Math.floor(1000 + Math.random() * 9000);
+      var initialPassword = generateInitialPassword();
+      
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0].map(function(h){ return h.toString().toLowerCase().replace(/[^a-z0-9]/g, ''); });
+      
+      var pIdCol = headers.indexOf("parentid") !== -1 ? headers.indexOf("parentid") + 1 : 1;
+      var statusCol = headers.indexOf("status") !== -1 ? headers.indexOf("status") + 1 : 13;
+      var passCol = headers.indexOf("password") !== -1 ? headers.indexOf("password") + 1 : 14;
+      var countCol = headers.indexOf("passchangecount") !== -1 ? headers.indexOf("passchangecount") + 1 : 15;
+      var emailCol = headers.indexOf("email") !== -1 ? headers.indexOf("email") + 1 : 6;
+      var nameCol = headers.indexOf("fullname") !== -1 ? headers.indexOf("fullname") + 1 : 2;
+      
+      sheet.getRange(rowIdx, pIdCol).setValue(officialParentId);
+      sheet.getRange(rowIdx, statusCol).setValue("Approved");
+      sheet.getRange(rowIdx, passCol).setValue(initialPassword);
+      sheet.getRange(rowIdx, countCol).setValue(0);
+      
+      var parentEmail = sheet.getRange(rowIdx, emailCol).getValue() || email;
+      var parentName = sheet.getRange(rowIdx, nameCol).getValue() || "Parent";
+      
+      sendApplicantApprovalEmail(parentEmail, parentName, officialParentId, initialPassword, "Parent");
+      return createJsonResponse({ status: 'success', officialId: officialParentId, initialPassword: initialPassword });
+    }
+  } else if (recordType === 'student') {
+    var sheet = getOrCreateSheet(ss, "Enrollments");
+    var rowIdx = findPendingRowIndex(sheet, reqId, email);
+    if (rowIdx > 0) {
+      var officialStudentId = "SL-2026-" + Math.floor(1000 + Math.random() * 9000);
+      var initialPassword = generateInitialPassword();
+      
+      var data = sheet.getDataRange().getValues();
+      var headers = data[0].map(function(h){ return h.toString().toLowerCase().replace(/[^a-z0-9]/g, ''); });
+      
+      var sIdCol = headers.indexOf("studentid") !== -1 ? headers.indexOf("studentid") + 1 : 1;
+      var statusCol = headers.indexOf("status") !== -1 ? headers.indexOf("status") + 1 : 11;
+      var passCol = headers.indexOf("password") !== -1 ? headers.indexOf("password") + 1 : 12;
+      var countCol = headers.indexOf("passchangecount") !== -1 ? headers.indexOf("passchangecount") + 1 : 13;
+      var emailCol = headers.indexOf("guardianemail") !== -1 ? headers.indexOf("guardianemail") + 1 : 8;
+      var nameCol = headers.indexOf("fullname") !== -1 ? headers.indexOf("fullname") + 1 : 2;
+      
+      sheet.getRange(rowIdx, sIdCol).setValue(officialStudentId);
+      sheet.getRange(rowIdx, statusCol).setValue("Approved");
+      sheet.getRange(rowIdx, passCol).setValue(initialPassword);
+      sheet.getRange(rowIdx, countCol).setValue(0);
+      
+      var guardianEmail = sheet.getRange(rowIdx, emailCol).getValue() || email;
+      var studentName = sheet.getRange(rowIdx, nameCol).getValue() || "Student";
+      
+      sendApplicantApprovalEmail(guardianEmail, studentName, officialStudentId, initialPassword, "Student");
+      return createJsonResponse({ status: 'success', officialId: officialStudentId, initialPassword: initialPassword });
+    }
+  }
+  
+  return createJsonResponse({ status: 'error', message: 'Pending record not found for approval.' });
+}
+
+function processRejection(ss, payload) {
+  var reqId = payload.requestId;
+  var email = payload.email;
+  var recordType = payload.type;
+  var sheetName = recordType === 'parent' ? "Parents" : "Enrollments";
+  var sheet = getOrCreateSheet(ss, sheetName);
+  var rowIdx = findPendingRowIndex(sheet, reqId, email);
+  
+  if (rowIdx > 0) {
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0].map(function(h){ return h.toString().toLowerCase().replace(/[^a-z0-9]/g, ''); });
+    var statusCol = headers.indexOf("status") !== -1 ? headers.indexOf("status") + 1 : (recordType === 'parent' ? 13 : 11);
+    sheet.getRange(rowIdx, statusCol).setValue("Rejected");
+    return createJsonResponse({ status: 'success', message: 'Record rejected.' });
+  }
+  return createJsonResponse({ status: 'error', message: 'Pending record not found.' });
+}
+
+function handleEmailActionLink(ss, params) {
+  var reqId = params.reqId;
+  var type = params.type || 'parent';
+  var action = params.action;
+  
+  if (action === 'approveRecordEmail') {
+    var res = processApproval(ss, { requestId: reqId, type: type });
+    var htmlContent = '<html><body style="font-family:sans-serif;padding:30px;background:#0f172a;color:#fff;text-align:center;">' +
+      '<h1 style="color:#10b981;">✅ Application Approved!</h1>' +
+      '<p>Request <b>' + reqId + '</b> has been verified and approved.</p>' +
+      '<p>Official ID and login password have been emailed to the applicant.</p>' +
+      '</body></html>';
+    return ContentService.createTextOutput(htmlContent).setMimeType(ContentService.MimeType.HTML);
   } else {
-    err.textContent = res ? res.message : 'Invalid ID or Password.';
+    processRejection(ss, { requestId: reqId, type: type });
+    var htmlContent = '<html><body style="font-family:sans-serif;padding:30px;background:#0f172a;color:#fff;text-align:center;">' +
+      '<h1 style="color:#ef4444;">✕ Application Rejected</h1>' +
+      '<p>Request <b>' + reqId + '</b> has been rejected.</p>' +
+      '</body></html>';
+    return ContentService.createTextOutput(htmlContent).setMimeType(ContentService.MimeType.HTML);
   }
 }
 
-function renderUserProfileBadge() {
-  document.getElementById('userLoginBox').classList.add('hidden');
-  const container = document.getElementById('userProfileContent');
-  container.classList.remove('hidden');
-
-  container.innerHTML = `
-    <div class="ticket approved">
-      <div class="ticket-main">
-        <div class="tag">✓ Official Approved Account</div>
-        <h3>${loggedInUser.fullName}</h3>
-        <div class="meta">
-          <div>Official ID<b>${loggedInUser.id}</b></div>
-          <div>Account Type<b>${loggedInUser.type}</b></div>
-          <div>Email<b>${loggedInUser.email}</b></div>
-          <div>Phone<b>${loggedInUser.phone}</b></div>
-        </div>
-      </div>
-      <div class="ticket-stub">
-        <div class="yr">'26</div>
-        <div class="id">${loggedInUser.id}</div>
-      </div>
-    </div>
-
-    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl flex justify-between items-center text-xs">
-      <div>
-        <span class="text-slate-400">Password Change Rate Limit:</span>
-        <span class="text-teal-400 font-bold ml-1">${loggedInUser.passChangeCount || 0} / 3 used this month</span>
-      </div>
-      <button class="btn btn-teal text-xs py-1.5 px-3" onclick="openUserPassModalWithId('${loggedInUser.id}')">🔑 Change My Password</button>
-    </div>`;
-}
-
-function openUserPassModal() {
-  document.getElementById('userPassModal').classList.remove('hidden');
-}
-function openUserPassModalWithId(id) {
-  document.getElementById('userPassId').value = id;
-  document.getElementById('userPassModal').classList.remove('hidden');
-}
-function closeUserPassModal() {
-  document.getElementById('userPassModal').classList.add('hidden');
-}
-
-async function submitUserPasswordChange() {
-  const id = document.getElementById('userPassId').value.trim().toUpperCase();
-  const oldPass = document.getElementById('userPassOld').value;
-  const newPass = document.getElementById('userPassNew').value;
-  const confirmPass = document.getElementById('userPassConfirm').value;
-  const err = document.getElementById('userPassErr');
-  const btn = document.getElementById('saveUserPassBtn');
-
-  if (!id || !oldPass || !newPass) {
-    err.textContent = 'Please fill in all required fields.';
-    return;
+function processUserLogin(ss, payload) {
+  var targetId = (payload.id || '').toString().trim().toUpperCase();
+  var passIn = (payload.password || '').toString().trim();
+  
+  var parentSheet = getOrCreateSheet(ss, "Parents");
+  var pRowIdx = findRowIndexByHeaderValue(parentSheet, "parentId", targetId);
+  if (pRowIdx > 0) {
+    var savedPass = parentSheet.getRange(pRowIdx, 14).getValue().toString();
+    var status = parentSheet.getRange(pRowIdx, 13).getValue().toString();
+    if (savedPass === passIn && (status === 'Approved' || status === 'Active')) {
+      return createJsonResponse({
+        status: 'success',
+        user: {
+          id: targetId,
+          type: 'Parent / Guardian',
+          fullName: parentSheet.getRange(pRowIdx, 2).getValue(),
+          email: parentSheet.getRange(pRowIdx, 6).getValue(),
+          phone: parentSheet.getRange(pRowIdx, 7).getValue(),
+          passChangeCount: parentSheet.getRange(pRowIdx, 15).getValue() || 0
+        }
+      });
+    }
   }
+  
+  var studentSheet = getOrCreateSheet(ss, "Enrollments");
+  var sRowIdx = findRowIndexByHeaderValue(studentSheet, "studentId", targetId);
+  if (sRowIdx > 0) {
+    var savedPass = studentSheet.getRange(sRowIdx, 12).getValue().toString();
+    var status = studentSheet.getRange(sRowIdx, 11).getValue().toString();
+    if (savedPass === passIn && (status === 'Approved' || status === 'Active')) {
+      return createJsonResponse({
+        status: 'success',
+        user: {
+          id: targetId,
+          type: 'Student',
+          fullName: studentSheet.getRange(sRowIdx, 2).getValue(),
+          email: studentSheet.getRange(sRowIdx, 8).getValue(),
+          phone: studentSheet.getRange(sRowIdx, 9).getValue(),
+          passChangeCount: studentSheet.getRange(sRowIdx, 13).getValue() || 0
+        }
+      });
+    }
+  }
+  
+  return createJsonResponse({ status: 'error', message: 'Invalid Official ID or Password.' });
+}
+
+function processChangeUserPassword(ss, payload) {
+  var targetId = (payload.id || '').toString().trim().toUpperCase();
+  var currentPass = (payload.currentPassword || '').toString().trim();
+  var newPass = (payload.newPassword || '').toString().trim();
+  
   if (newPass.length < 4) {
-    err.textContent = 'New password must be at least 4 characters.';
-    return;
+    return createJsonResponse({ status: 'error', message: 'New password must be at least 4 characters.' });
   }
-  if (newPass !== confirmPass) {
-    err.textContent = 'New passwords do not match.';
-    return;
-  }
-
-  btn.disabled = true;
-  btn.textContent = 'Updating Password...';
-
-  const res = await syncDataToGoogleSheet('changeUserPassword', {
-    id: id,
-    currentPassword: oldPass,
-    newPassword: newPass
-  });
-
-  btn.disabled = false;
-  btn.textContent = 'Update Password';
-
-  if (res && res.status === 'success') {
-    alert('Password updated successfully! Saved to central Google Sheet database.');
-    closeUserPassModal();
-    if (loggedInUser && loggedInUser.id === id) {
-      loggedInUser.passChangeCount = res.passChangeCount;
-      renderUserProfileBadge();
-    }
-  } else {
-    err.textContent = res ? res.message : 'Error updating password.';
-  }
-}
-
-const form = { enrollType: 'Parent' };
-const uploadedFiles = {};
-
-function getSteps() {
-  return form.enrollType === 'Parent' 
-    ? ["Parent Profile", "Contact Details", "Triple Govt ID Vault", "Review & Submit"]
-    : ["Parent Verification", "Student Demographics", "Document Upload", "Review & Submit"];
-}
-
-let currentStep = 0;
-
-function renderStepList(){
-  const activeSteps = getSteps();
-  document.getElementById('stepList').innerHTML = activeSteps.map((s,i)=>`
-    <div class="step-item ${i===currentStep?'active':''} ${i<currentStep?'done':''}">
-      <div class="dot">${i<currentStep?'✓':i+1}</div>${s}
-    </div>`).join('');
-  document.getElementById('progressFill').style.width = ((currentStep+1)/activeSteps.length*100)+'%';
-}
-
-function fieldHTML(id,label,type,opts){
-  opts = opts||{};
-  const val = form[id]||'';
-  let input;
-  if(type==='select'){
-    input = `<select id="f_${id}" ${opts.attr||''}>${opts.options}</select>`;
-  } else if(type==='textarea'){
-    input = `<textarea id="f_${id}" rows="3" ${opts.attr||''}>${val}</textarea>`;
-  } else {
-    input = `<input type="${type}" id="f_${id}" value="${val}" placeholder="${opts.ph||''}" ${opts.attr||''}>`;
-  }
-  return `<div class="field" id="wrap_${id}"><label>${label}</label>${input}<div class="err" id="err_${id}">${opts.errNote || 'Required field'}</div></div>`;
-}
-
-function renderStep(){
-  renderStepList();
-  const body = document.getElementById('stepBody');
-  const activeSteps = getSteps();
-  document.getElementById('backBtn').disabled = currentStep===0;
-  document.getElementById('nextBtn').textContent = currentStep===activeSteps.length-1 
-    ? (form.enrollType === 'Parent' ? 'Submit Parent Registration' : 'Submit Student Application') 
-    : 'Continue';
-
-  if (form.enrollType === 'Parent') {
-    renderParentWizardStep(body);
-  } else {
-    renderStudentWizardStep(body);
-  }
-}
-
-function renderParentWizardStep(body) {
-  if (currentStep === 0) {
-    body.innerHTML = `<h2>Parent / Guardian Profile</h2><div class="sub">Please fill in your primary demographics. Parent must be at least 22 years old.</div>
-    <div class="grid2">
-      ${fieldHTML('enrollType','Registering As','select',{options:`<option value="Parent" selected>Parent / Guardian</option><option value="Student">Student (Requires Parent ID)</option>`, attr:'onchange="handleTypeChange(this.value)"'})}
-      ${fieldHTML('fullName','Parent Full Name','text',{ph:'e.g. Ramesh Kumar', errNote:'Name must be at least 2 characters'})}
-      ${fieldHTML('dob','Date of Birth','date',{errNote:'Parent must be at least 22 years old'})}
-      ${fieldHTML('gender','Gender','select',{options:`<option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>`})}
-      ${fieldHTML('nationality','Nationality','select',{options:`<option value="Indian" selected>Indian</option><option value="NRI">NRI</option><option value="Foreign National">Foreign National</option>`})}
-    </div>`;
-  } 
-  else if (currentStep === 1) {
-    body.innerHTML = `<h2>Contact & Residential Details</h2><div class="sub">Official contact details for parent portal communication.</div>
-    <div class="grid2">
-      ${fieldHTML('guardianEmail','Parent Email Address','email',{ph:'name@example.com', errNote:'Must be a valid email address'})}
-      ${fieldHTML('guardianPhone','Mobile Phone Number','text',{ph:'10 to 15 digits', errNote:'Numbers only (10 to 15 digits)'})}
-      ${fieldHTML('street','Street Address','text')}
-      ${fieldHTML('city','City / Location','text')}
-    </div>`;
-  }
-  else if (currentStep === 2) {
-    body.innerHTML = `<h2>Triple Mandatory Government ID Vault</h2><div class="sub">Upload or capture <b>at least 3 distinct government IDs</b> (PDF or Images).</div>
-    <div class="uploadgrid">
-      ${renderDocSlot('doc1', '1. Aadhaar Card / ID 1')}
-      ${renderDocSlot('doc2', '2. PAN Card / ID 2')}
-      ${renderDocSlot('doc3', '3. Voter ID / Passport / ID 3')}
-      ${renderDocSlot('doc4', '4. Driving License / Optional ID 4')}
-    </div>
-    <div class="err text-center mt-3" id="tripleDocErr" style="display:none;color:var(--err-tx)">At least 3 distinct Government IDs are mandatory.</div>`;
-  }
-  else if (currentStep === 3) {
-    body.innerHTML = `<h2>Review & Submit Parent Registration</h2><div class="sub">Your registration will be submitted to the Admin for document inspection.</div>
-    <div class="review-summary">
-      <div><b>Full Name</b>${form.fullName||'—'}</div>
-      <div><b>Date of Birth</b>${form.dob||'—'} (Age: ${getAgeInYears(form.dob)} yrs)</div>
-      <div><b>Gender</b>${form.gender||'—'}</div>
-      <div><b>Nationality</b>${form.nationality||'Indian'}</div>
-      <div><b>Email Address</b>${form.guardianEmail||'—'}</div>
-      <div><b>Mobile Phone</b>${form.guardianPhone||'—'}</div>
-      <div><b>Address</b>${form.street||'—'}, ${form.city||'—'}</div>
-      <div><b>Uploaded Govt IDs</b>${Object.keys(uploadedFiles).length} Attached</div>
-    </div>
-    <div id="confirmationArea"></div>`;
-  }
-}
-
-function renderStudentWizardStep(body) {
-  if (currentStep === 0) {
-    body.innerHTML = `<h2>Parent Verification</h2><div class="sub">Validate your registered Parent ID before enrolling a student.</div>
-    <div class="field">
-      ${fieldHTML('enrollType','Enrolling As','select',{options:`<option value="Parent">Parent / Guardian</option><option value="Student" selected>Student (Requires Parent ID)</option>`, attr:'onchange="handleTypeChange(this.value)"'})}
-    </div>
-    <div class="field" id="wrap_parentId">
-      <label>Enter Registered Parent ID *</label>
-      <div class="flex gap-2">
-        <input type="text" id="f_parentId" value="${form.parentId||''}" placeholder="e.g. PAR-2026-1001" style="text-transform:uppercase" class="mono">
-        <button class="btn btn-teal" type="button" onclick="validateParentIdInput()">Verify ID</button>
-      </div>
-      <div class="err" id="err_parentId">Parent ID not found. Please register as a Parent first.</div>
-    </div>
-    <div id="parentVerifyResult" class="mt-4"></div>`;
-  }
-  else if (currentStep === 1) {
-    body.innerHTML = `<h2>Student Demographics</h2><div class="sub">Personal details of the student applicant.</div>
-    <div class="grid2">
-      ${fieldHTML('studentFullName','Student Full Name','text',{ph:'e.g. Aarav Mehta', errNote:'Name must be at least 2 characters'})}
-      ${fieldHTML('dob','Date of Birth','date')}
-      ${fieldHTML('gender','Gender','select',{options:`<option value="">Select</option><option>Male</option><option>Female</option><option>Other</option>`})}
-      ${fieldHTML('gradeApplying','Grade Applying For','select',{options:'<option value="">Select Grade</option>'+gradeOptions(form.gradeApplying)})}
-    </div>`;
-  }
-  else if (currentStep === 2) {
-    body.innerHTML = `<h2>Document Upload Vault</h2><div class="sub">Attach student identification documents.</div>
-    <div class="uploadgrid">
-      ${renderDocSlot('birthCert', 'Birth Certificate (PDF / Image)')}
-    </div>`;
-  }
-  else if (currentStep === 3) {
-    body.innerHTML = `<h2>Review & Submit Student Application</h2><div class="sub">Your application will be submitted for Admin approval.</div>
-    <div class="review-summary">
-      <div><b>Student Full Name</b>${form.studentFullName||'—'}</div>
-      <div><b>Date of Birth</b>${form.dob||'—'}</div>
-      <div><b>Target Grade</b>${form.gradeApplying||'—'}</div>
-      <div><b>Verified Parent ID</b>${form.parentId||'—'}</div>
-    </div>
-    <div id="confirmationArea"></div>`;
-  }
-}
-
-function handleTypeChange(val) {
-  form.enrollType = val;
-  currentStep = 0;
-  renderStep();
-}
-
-function gradeOptions(selected){
-  return Object.keys(DB.gradeCapacity).map(g=>{
-    const left = seatsLeft(g);
-    return `<option value="${g}" ${selected===g?'selected':''}>${g} — ${left} seats left</option>`;
-  }).join('');
-}
-
-function renderDocSlot(slotKey, label) {
-  const isFilled = !!uploadedFiles[slotKey];
-  return `
-    <div class="dropslot ${isFilled ? 'filled' : ''}" id="slot_${slotKey}">
-      <div class="mb-2 font-semibold text-xs">${isFilled ? '📄 <span class="name">'+uploadedFiles[slotKey].name+'</span>' : label}</div>
-      <div class="flex justify-center gap-2 mt-2">
-        <label class="btn btn-ghost text-xs cursor-pointer py-1 px-3">
-          Upload File
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onchange="handleFileUpload('${slotKey}', this.files[0])" style="display:none">
-        </label>
-        <button class="btn btn-teal text-xs py-1 px-3" type="button" onclick="openCamera('${slotKey}')">📷 Camera</button>
-      </div>
-    </div>`;
-}
-
-function handleFileUpload(slotKey, file) {
-  if (!file) return;
-  const validTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-  if (!validTypes.includes(file.type)) {
-    alert('Invalid file format. Please upload PDF or Image (.jpg, .jpeg, .png) files only.');
-    return;
-  }
-  uploadedFiles[slotKey] = file;
-  renderStep();
-}
-
-function openCamera(slotKey) {
-  activeCameraSlot = slotKey;
-  document.getElementById('cameraModal').classList.remove('hidden');
-  const video = document.getElementById('cameraVideo');
   
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(stream => {
-      mediaStream = stream;
-      video.srcObject = stream;
-    })
-    .catch(err => {
-      alert('Camera access denied or unavailable.');
-      stopCamera();
+  var currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM");
+  
+  var parentSheet = getOrCreateSheet(ss, "Parents");
+  var pRowIdx = findRowIndexByHeaderValue(parentSheet, "parentId", targetId);
+  if (pRowIdx > 0) {
+    var savedPass = parentSheet.getRange(pRowIdx, 14).getValue().toString();
+    var passCount = parseInt(parentSheet.getRange(pRowIdx, 15).getValue() || 0, 10);
+    var lastMonth = parentSheet.getRange(pRowIdx, 16).getValue().toString();
+    
+    if (savedPass !== currentPass) {
+      return createJsonResponse({ status: 'error', message: 'Current password does not match.' });
+    }
+    
+    if (lastMonth !== currentMonth) passCount = 0;
+    if (passCount >= 3) return createJsonResponse({ status: 'error', message: 'Monthly password change limit reached (Max 3 times per month).' });
+    
+    passCount++;
+    parentSheet.getRange(pRowIdx, 14).setValue(newPass);
+    parentSheet.getRange(pRowIdx, 15).setValue(passCount);
+    parentSheet.getRange(pRowIdx, 16).setValue(currentMonth);
+    
+    return createJsonResponse({ status: 'success', message: 'Password updated successfully.', passChangeCount: passCount });
+  }
+  
+  var studentSheet = getOrCreateSheet(ss, "Enrollments");
+  var sRowIdx = findRowIndexByHeaderValue(studentSheet, "studentId", targetId);
+  if (sRowIdx > 0) {
+    var savedPass = studentSheet.getRange(sRowIdx, 12).getValue().toString();
+    var passCount = parseInt(studentSheet.getRange(sRowIdx, 13).getValue() || 0, 10);
+    var lastMonth = studentSheet.getRange(sRowIdx, 14).getValue().toString();
+    
+    if (savedPass !== currentPass) {
+      return createJsonResponse({ status: 'error', message: 'Current password does not match.' });
+    }
+    
+    if (lastMonth !== currentMonth) passCount = 0;
+    if (passCount >= 3) return createJsonResponse({ status: 'error', message: 'Monthly password change limit reached (Max 3 times per month).' });
+    
+    passCount++;
+    studentSheet.getRange(sRowIdx, 12).setValue(newPass);
+    studentSheet.getRange(sRowIdx, 13).setValue(passCount);
+    studentSheet.getRange(sRowIdx, 14).setValue(currentMonth);
+    
+    return createJsonResponse({ status: 'success', message: 'Password updated successfully.', passChangeCount: passCount });
+  }
+  
+  return createJsonResponse({ status: 'error', message: 'Official ID not found.' });
+}
+
+function sendApplicantApprovalEmail(toEmail, name, officialId, initialPassword, type) {
+  if (!toEmail) return;
+  try {
+    var subject = "Congratulations! Your ScholaLink " + type + " Account is Approved";
+    var htmlBody = '<div style="font-family:Arial,sans-serif;padding:22px;background:#0f172a;color:#f8fafc;border-radius:12px;">' +
+      '<h2 style="color:#10b981;">🎉 Application Approved!</h2>' +
+      '<p>Dear ' + name + ',</p>' +
+      '<p>Your ' + type + ' application has been verified and approved by ScholaLink Administration.</p>' +
+      '<div style="background:#1e293b;padding:20px;border-radius:10px;text-align:center;margin:20px 0;border:1px solid #14b8a6;">' +
+        '<p style="margin:0;font-size:12px;color:#94a3b8;text-transform:uppercase;">Your Official ' + type + ' ID</p>' +
+        '<h1 style="margin:10px 0;color:#14b8a6;font-family:monospace;letter-spacing:2px;">' + officialId + '</h1>' +
+        '<p style="margin:10px 0 0;font-size:12px;color:#94a3b8;text-transform:uppercase;">Initial Temporary Password</p>' +
+        '<h2 style="margin:5px 0;color:#fcd34d;font-family:monospace;">' + initialPassword + '</h2>' +
+      '</div>' +
+      '<p>You can now sign in to the ScholaLink Approved User Portal using this ID and Password.</p>' +
+    '</div>';
+    
+    GmailApp.sendEmail(toEmail, subject, "", { htmlBody: htmlBody });
+  } catch (e) {
+    Logger.log("Applicant Email Error: " + e.toString());
+  }
+}
+
+function sendAdminNotificationEmail(info) {
+  try {
+    var adminEmail = PRIMARY_ADMIN_EMAIL;
+    try {
+      var eff = Session.getEffectiveUser().getEmail();
+      if (eff && eff.indexOf("@") !== -1) adminEmail = eff;
+    } catch(e) {}
+    
+    var scriptUrl = ScriptApp.getService().getUrl();
+    var approveUrl = scriptUrl + "?action=approveRecordEmail&reqId=" + info.reqId + "&type=" + (info.type.indexOf("Parent") !== -1 ? "parent" : "student");
+    var rejectUrl = scriptUrl + "?action=rejectRecordEmail&reqId=" + info.reqId + "&type=" + (info.type.indexOf("Parent") !== -1 ? "parent" : "student");
+    
+    var docsListHtml = "";
+    for (var key in info.docUrls) {
+      if (info.docUrls[key]) {
+        docsListHtml += '<li><a href="' + info.docUrls[key] + '" target="_blank" style="color:#14b8a6;font-weight:bold;">View ' + key + ' Document</a></li>';
+      }
+    }
+    
+    var htmlBody = '<div style="font-family:Arial,sans-serif;padding:20px;background:#0f172a;color:#f8fafc;border-radius:12px;">' +
+      '<h2 style="color:#14b8a6;">📝 Action Required: New ' + info.type + '</h2>' +
+      '<p>A new registration has been submitted and requires document review.</p>' +
+      '<div style="background:#1e293b;padding:15px;border-radius:8px;">' +
+        '<p style="margin:4px 0;"><b>Request Ref ID:</b> ' + info.reqId + '</p>' +
+        '<p style="margin:4px 0;"><b>Applicant Name:</b> ' + info.applicantName + '</p>' +
+        '<p style="margin:4px 0;"><b>Email:</b> ' + info.email + '</p>' +
+        '<p style="margin:4px 0;"><b>Phone:</b> ' + info.phone + '</p>' +
+      '</div>' +
+      '<h3>Uploaded Documents:</h3>' +
+      '<ul>' + docsListHtml + '</ul>' +
+      '<div style="margin-top:20px;">' +
+        '<a href="' + approveUrl + '" style="background:#10b981;color:#fff;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:bold;margin-right:10px;display:inline-block;">✓ Approve & Issue Credentials</a>' +
+        '<a href="' + rejectUrl + '" style="background:#ef4444;color:#fff;padding:12px 20px;text-decoration:none;border-radius:8px;font-weight:bold;display:inline-block;">✕ Reject Application</a>' +
+      '</div>' +
+    '</div>';
+    
+    GmailApp.sendEmail(adminEmail, "Action Required: New " + info.type + " Submission (" + info.reqId + ")", "", {
+      htmlBody: htmlBody
     });
-}
-
-function stopCamera() {
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(track => track.stop());
+  } catch (e) {
+    Logger.log("Admin Notification Error: " + e.toString());
   }
-  document.getElementById('cameraModal').classList.add('hidden');
 }
 
-function takeSnapshot() {
-  const video = document.getElementById('cameraVideo');
-  const canvas = document.getElementById('cameraCanvas');
-  canvas.width = video.videoWidth || 640;
-  canvas.height = video.videoHeight || 480;
-  
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-  
-  canvas.toBlob(blob => {
-    const file = new File([blob], `Snapshot_${activeCameraSlot}_${Date.now()}.jpg`, { type: 'image/jpeg' });
-    uploadedFiles[activeCameraSlot] = file;
-    stopCamera();
-    renderStep();
-  }, 'image/jpeg');
+function getOrCreateSheet(ss, name) {
+  var sheet = ss.getSheetByName(name);
+  if (!sheet) {
+    sheet = ss.insertSheet(name);
+  }
+  return sheet;
 }
 
-function validateParentIdInput() {
-  const inp = document.getElementById('f_parentId');
-  const val = (inp.value || '').trim().toUpperCase();
-  const wrap = document.getElementById('wrap_parentId');
-  const resultDiv = document.getElementById('parentVerifyResult');
+function ensureHeaders(sheet, headers) {
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(headers);
+  }
+}
 
-  const match = DB.parents.find(p => (p.parentId && p.parentId.toUpperCase() === val) || (p.requestId && p.requestId.toUpperCase() === val));
-  if (match) {
-    form.parentId = match.parentId && match.parentId !== 'PENDING APPROVAL' ? match.parentId : match.requestId;
-    wrap.classList.remove('invalid');
-    resultDiv.innerHTML = `
-      <div class="p-3 bg-teal-500/10 border border-teal-500/40 rounded-xl flex items-center justify-between text-xs text-teal-300">
-        <div>
-          <b>Verified Parent:</b> ${match.fullName}<br>
-          <b>Email:</b> ${match.email} | <b>Phone:</b> ${match.phone}
-        </div>
-        <i class="fas fa-check-circle text-teal-400 text-lg"></i>
-      </div>`;
-    return true;
+function getOrCreateDriveFolder(folderName) {
+  var folders = DriveApp.getFoldersByName(folderName);
+  if (folders.hasNext()) {
+    return folders.next();
   } else {
-    wrap.classList.add('invalid');
-    resultDiv.innerHTML = `
-      <div class="p-3 bg-red-500/10 border border-red-500/40 rounded-xl text-xs text-red-300">
-        ❌ Parent ID <strong>"${val}"</strong> not found in database. Please register as a Parent first.
-      </div>`;
-    return false;
+    return DriveApp.createFolder(folderName);
   }
 }
 
-function collectStepFields(){
-  document.querySelectorAll('[id^="f_"]').forEach(el=>{ form[el.id.slice(2)] = el.value.trim(); });
+function getSheetRowsAsObjects(sheet) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  var headers = data[0];
+  var result = [];
+  for (var i = 1; i < data.length; i++) {
+    var obj = {};
+    for (var j = 0; j < headers.length; j++) {
+      obj[headers[j]] = data[i][j] !== undefined ? data[i][j].toString() : "";
+    }
+    result.push(obj);
+  }
+  return result;
 }
 
-function validateStep() {
-  collectStepFields();
-  let isValid = true;
-  document.querySelectorAll('.field').forEach(f => f.classList.remove('invalid'));
-
-  if (form.enrollType === 'Parent') {
-    if (currentStep === 0) {
-      if (!form.fullName || form.fullName.length < 2) {
-        document.getElementById('wrap_fullName').classList.add('invalid');
-        isValid = false;
-      }
-      if (!form.dob || getAgeInYears(form.dob) < 22) {
-        document.getElementById('wrap_dob').classList.add('invalid');
-        isValid = false;
-      }
-      if (!form.gender) {
-        document.getElementById('wrap_gender').classList.add('invalid');
-        isValid = false;
-      }
-    } else if (currentStep === 1) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!form.guardianEmail || !emailRegex.test(form.guardianEmail)) {
-        document.getElementById('wrap_guardianEmail').classList.add('invalid');
-        isValid = false;
-      }
-      const phoneRegex = /^\d{10,15}$/;
-      if (!form.guardianPhone || !phoneRegex.test(form.guardianPhone.replace(/\D/g, ''))) {
-        document.getElementById('wrap_guardianPhone').classList.add('invalid');
-        isValid = false;
-      }
-    } else if (currentStep === 2) {
-      const uploadedCount = Object.keys(uploadedFiles).filter(k => k.startsWith('doc')).length;
-      if (uploadedCount < 3) {
-        document.getElementById('tripleDocErr').style.display = 'block';
-        isValid = false;
-      } else {
-        document.getElementById('tripleDocErr').style.display = 'none';
-      }
-    }
-  } else {
-    if (currentStep === 0) {
-      if (!validateParentIdInput()) {
-        isValid = false;
-      }
-    } else if (currentStep === 1) {
-      if (!form.studentFullName || form.studentFullName.length < 2) {
-        document.getElementById('wrap_studentFullName').classList.add('invalid');
-        isValid = false;
-      }
-      if (!form.dob) {
-        document.getElementById('wrap_dob').classList.add('invalid');
-        isValid = false;
-      }
-      if (!form.gradeApplying) {
-        document.getElementById('wrap_gradeApplying').classList.add('invalid');
-        isValid = false;
-      }
+function findRowIndexByHeaderValue(sheet, headerName, value) {
+  var data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return -1;
+  var headers = data[0];
+  
+  var colIdx = -1;
+  var targetHeader = headerName.toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+  for (var c = 0; c < headers.length; c++) {
+    var h = headers[c].toString().toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (h === targetHeader) {
+      colIdx = c;
+      break;
     }
   }
-
-  return isValid;
-}
-
-function nextStep(){
-  if (!validateStep()) return;
-  const activeSteps = getSteps();
-  if (currentStep === activeSteps.length - 1) {
-    if (form.enrollType === 'Parent') {
-      submitParentRegistration();
-    } else {
-      submitStudentEnrollment();
-    }
-    return;
-  }
-  currentStep++;
-  renderStep();
-}
-
-function prevStep(){ if(currentStep>0){ currentStep--; renderStep(); } }
-
-async function submitParentRegistration() {
-  const btn = document.getElementById('nextBtn');
-  btn.disabled = true;
-  btn.textContent = 'Submitting Application...';
-
-  const reqId = "PAR-REQ-" + Math.floor(1000 + Math.random() * 9000);
-  const docsPayload = {};
-
-  for (let key of Object.keys(uploadedFiles)) {
-    if (uploadedFiles[key]) {
-      docsPayload[key] = await fileToBase64(uploadedFiles[key]);
+  
+  if (colIdx === -1) return -1;
+  
+  var targetVal = (value || '').toString().trim().toUpperCase();
+  for (var i = 1; i < data.length; i++) {
+    var cellVal = (data[i][colIdx] || '').toString().trim().toUpperCase();
+    if (cellVal === targetVal) {
+      return i + 1;
     }
   }
-
-  const parentPayload = {
-    requestId: reqId,
-    fullName: form.fullName,
-    dob: form.dob,
-    gender: form.gender,
-    nationality: form.nationality || 'Indian',
-    email: form.guardianEmail,
-    phone: form.guardianPhone,
-    street: form.street,
-    city: form.city
-  };
-
-  DB.parents.push({ ...parentPayload, parentId: "PENDING APPROVAL", status: "Pending Approval" });
-  await syncDataToGoogleSheet('registerParent', { parent: parentPayload, documents: docsPayload });
-
-  document.getElementById('confirmationArea').innerHTML = `
-    <div class="ticket">
-      <div class="ticket-main">
-        <div class="tag">⏳ Registration Pending Admin Approval</div>
-        <h3>${form.fullName}</h3>
-        <div class="meta">
-          <div>Ref Request ID<b>${reqId}</b></div>
-          <div>Email<b>${form.guardianEmail}</b></div>
-          <div>Phone<b>${form.guardianPhone}</b></div>
-          <div>Status<b class="text-amber-400">Pending Review</b></div>
-        </div>
-      </div>
-      <div class="ticket-stub">
-        <div class="yr">'26</div>
-        <div class="id">${reqId}</div>
-      </div>
-    </div>
-    <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 mt-3 text-center">
-      📩 Application submitted! An approval notification with your uploaded documents has been sent to the Admin. Upon approval, your Official Parent ID and Password will be emailed to you.
-    </div>`;
-
-  btn.textContent = 'Submitted for Review';
+  return -1;
 }
 
-async function submitStudentEnrollment() {
-  const btn = document.getElementById('nextBtn');
-  btn.disabled = true;
-  btn.textContent = 'Submitting Application...';
-
-  const reqId = "SL-REQ-" + Math.floor(1000 + Math.random() * 9000);
-  const docsPayload = {};
-
-  if (uploadedFiles['birthCert']) {
-    docsPayload['birthCert'] = await fileToBase64(uploadedFiles['birthCert']);
-  }
-
-  const parentMatch = DB.parents.find(p => (p.parentId && p.parentId.toUpperCase() === form.parentId.toUpperCase()) || (p.requestId && p.requestId.toUpperCase() === form.parentId.toUpperCase()));
-
-  const studentPayload = {
-    requestId: reqId,
-    fullName: form.studentFullName,
-    dob: form.dob,
-    gender: form.gender,
-    gradeApplying: form.gradeApplying,
-    parentId: form.parentId,
-    guardianName: parentMatch ? parentMatch.fullName : '',
-    guardianEmail: parentMatch ? parentMatch.email : '',
-    guardianPhone: parentMatch ? parentMatch.phone : ''
-  };
-
-  DB.students.push({ ...studentPayload, studentId: "PENDING APPROVAL", status: "Pending Approval" });
-
-  await syncDataToGoogleSheet('submitStudent', { student: studentPayload, documents: docsPayload });
-
-  document.getElementById('confirmationArea').innerHTML = `
-    <div class="ticket">
-      <div class="ticket-main">
-        <div class="tag">⏳ Enrollment Pending Admin Review</div>
-        <h3>${form.studentFullName}</h3>
-        <div class="meta">
-          <div>Ref Request ID<b>${reqId}</b></div>
-          <div>Target Grade<b>${form.gradeApplying}</b></div>
-          <div>Parent ID<b>${form.parentId}</b></div>
-          <div>Status<b class="text-amber-400">Pending Review</b></div>
-        </div>
-      </div>
-      <div class="ticket-stub">
-        <div class="yr">'26</div>
-        <div class="id">${reqId}</div>
-      </div>
-    </div>
-    <div class="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs text-amber-300 mt-3 text-center">
-      📩 Application submitted successfully! Upon approval, the official Student ID & Password will be emailed to you.
-    </div>`;
-
-  btn.textContent = 'Submitted for Review';
+function createJsonResponse(data) {
+  return ContentService.createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
 }
-
-function downloadTemplate(){
-  const headers = ["Full_Name","DOB","Gender","Target_Grade","Parent_ID"];
-  const example = ["Aarav Sharma","2015-05-10","Male","Grade 5","PAR-2026-1001"];
-  const ws = XLSX.utils.aoa_to_sheet([headers, example]);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "BulkTemplate");
-  XLSX.writeFile(wb, "ScholaLink_Bulk_Enrollment_Template.xlsx");
-}
-
-document.getElementById('fileInput')?.addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const wb = XLSX.read(new Uint8Array(ev.target.result), {type:'array'});
-    const sheet = wb.Sheets[wb.SheetNames[0]];
-    const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
-    bulkData = rows;
-    document.getElementById('statTotal').textContent = rows.length;
-    document.getElementById('statOk').textContent = rows.length;
-    document.getElementById('bulkResults').classList.remove('hidden');
-  };
-  reader.readAsArrayBuffer(file);
-});
-
-async function processBulk(){
-  const btn = document.getElementById('processBtn');
-  btn.disabled = true;
-  btn.textContent = 'Processing Bulk Batch...';
-
-  await syncDataToGoogleSheet('bulkStudentUpload', { batch: bulkData });
-
-  document.getElementById('modalOk').textContent = bulkData.length;
-  document.getElementById('modalSkip').textContent = '0';
-  document.getElementById('summaryModal').classList.remove('hidden');
-  btn.disabled = false;
-  btn.textContent = 'Process Bulk Registration';
-}
-
-function closeModal(){
-  document.getElementById('summaryModal').classList.add('hidden');
-  document.getElementById('bulkResults').classList.add('hidden');
-}
-
-// Initializing application on load
-window.onload = function() {
-  renderStep();
-  fetchGoogleSheetDatabase();
-};
-</script>
-</body>
-</html>
